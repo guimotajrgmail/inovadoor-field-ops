@@ -1,28 +1,144 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import {
+  int,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+} from "drizzle-orm/mysql-core";
 
-/**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
- */
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  accessProfile: mysqlEnum("accessProfile", ["gestao", "terceiros", "pessoas", "campo"]).default("gestao").notNull(),
+  organizationId: int("organizationId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+export const organizations = mysqlTable("organizations", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 180 }).notNull(),
+  slug: varchar("slug", { length: 120 }).notNull().unique(),
+  segment: varchar("segment", { length: 120 }).default("Portas industriais").notNull(),
+  plan: varchar("plan", { length: 60 }).default("enterprise").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const teamMembers = mysqlTable("teamMembers", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 40 }),
+  profile: mysqlEnum("profile", ["gestao", "coordenacao", "campo", "terceiro"]).default("campo").notNull(),
+  area: varchar("area", { length: 120 }).default("Operações de campo").notNull(),
+  status: mysqlEnum("status", ["ativo", "pendente", "inativo"]).default("ativo").notNull(),
+  lastAccessAt: timestamp("lastAccessAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const customers = mysqlTable("customers", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  document: varchar("document", { length: 30 }),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 2 }),
+  address: text("address"),
+  contactName: varchar("contactName", { length: 160 }),
+  contactEmail: varchar("contactEmail", { length: 320 }),
+  contactPhone: varchar("contactPhone", { length: 40 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const thirdParties = mysqlTable("thirdParties", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  document: varchar("document", { length: 30 }),
+  region: varchar("region", { length: 100 }),
+  contactName: varchar("contactName", { length: 160 }),
+  contactEmail: varchar("contactEmail", { length: 320 }),
+  status: mysqlEnum("status", ["homologado", "em_revisao", "bloqueado"]).default("em_revisao").notNull(),
+  slaPercent: int("slaPercent").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const equipment = mysqlTable("equipment", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  customerId: int("customerId"),
+  code: varchar("code", { length: 80 }).notNull().unique(),
+  name: varchar("name", { length: 180 }).notNull(),
+  model: varchar("model", { length: 120 }),
+  serialNumber: varchar("serialNumber", { length: 120 }),
+  state: mysqlEnum("state", ["operacional", "manutencao", "atencao", "baixado"]).default("operacional").notNull(),
+  installedAt: timestamp("installedAt"),
+  lastMaintenanceAt: timestamp("lastMaintenanceAt"),
+  nextMaintenanceAt: timestamp("nextMaintenanceAt"),
+  qrCode: varchar("qrCode", { length: 160 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const workOrders = mysqlTable("workOrders", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  customerId: int("customerId"),
+  equipmentId: int("equipmentId"),
+  assignedMemberId: int("assignedMemberId"),
+  assignedThirdPartyId: int("assignedThirdPartyId"),
+  externalId: varchar("externalId", { length: 80 }).notNull().unique(),
+  title: varchar("title", { length: 180 }).notNull(),
+  serviceType: varchar("serviceType", { length: 120 }).notNull(),
+  priority: mysqlEnum("priority", ["baixa", "media", "alta"]).default("media").notNull(),
+  status: mysqlEnum("status", ["rascunho", "agendada", "em_campo", "aguardando_peca", "em_aprovacao", "concluida", "cancelada"]).default("rascunho").notNull(),
+  scheduledAt: timestamp("scheduledAt"),
+  checkInAt: timestamp("checkInAt"),
+  checkOutAt: timestamp("checkOutAt"),
+  latitude: varchar("latitude", { length: 32 }),
+  longitude: varchar("longitude", { length: 32 }),
+  address: text("address"),
+  checklistJson: text("checklistJson"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const workOrderEvents = mysqlTable("workOrderEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  workOrderId: int("workOrderId").notNull(),
+  actorUserId: int("actorUserId"),
+  type: varchar("type", { length: 80 }).notNull(),
+  payloadJson: text("payloadJson"),
+  occurredAt: timestamp("occurredAt").defaultNow().notNull(),
+});
+
+export const integrationConnections = mysqlTable("integrationConnections", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  provider: mysqlEnum("provider", ["monday", "maps", "email"]).notNull(),
+  status: mysqlEnum("status", ["pendente", "conectado", "erro"]).default("pendente").notNull(),
+  workspaceId: varchar("workspaceId", { length: 120 }),
+  settingsJson: text("settingsJson"),
+  lastSyncAt: timestamp("lastSyncAt"),
+  lastError: text("lastError"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
-
-// TODO: Add your tables here
+export type WorkOrder = typeof workOrders.$inferSelect;
+export type InsertWorkOrder = typeof workOrders.$inferInsert;
