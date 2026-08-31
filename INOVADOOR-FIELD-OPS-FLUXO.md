@@ -60,7 +60,7 @@ A implementação foi validada com TypeScript, testes automatizados e build de p
 | Verificação | Resultado |
 |---|---|
 | `pnpm check` | Aprovado, sem erros TypeScript |
-| `pnpm test` | Aprovado: 9 testes em 2 arquivos |
+| `pnpm test` | Aprovado: 10 testes em 2 arquivos |
 | `pnpm build` | Aprovado, frontend e servidor compilados |
 | Preview do dashboard | Carregado com menu de Formulários e botão Abrir chamado |
 | Console após recarga | Sem saída de erro registrada |
@@ -70,7 +70,7 @@ Os testes cobrem autenticação obrigatória para dados operacionais, resumo tip
 
 ## Limitações atuais
 
-A interface entregue mantém um modo demonstrativo persistido em `localStorage` para funcionar imediatamente no preview sem sessão autenticada. Nas áreas que já possuem sincronização, a interface tenta usar tRPC quando há sessão e conserva fallback local quando não há. Antes do uso operacional definitivo, ainda é recomendável homologar credenciais, permissões e nomes de campos no board real do monday.com, além de definir a política de retenção das evidências.
+A interface entregue mantém um modo demonstrativo persistido em `localStorage` para funcionar imediatamente no preview sem sessão autenticada. A listagem e criação de formulários, envio de evidências, associação de escopos de usuários e configurações monday.com usam tRPC quando há sessão e conservam fallback local quando não há. Antes do uso operacional definitivo, ainda é recomendável homologar credenciais, permissões e nomes de campos no board real do monday.com, além de definir a política de retenção das evidências.
 
 ## Conclusão
 
