@@ -138,7 +138,36 @@ export const integrationConnections = mysqlTable("integrationConnections", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const serviceFormTemplates = mysqlTable("serviceFormTemplates", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  category: mysqlEnum("category", ["atendimento", "instalacao"]).notNull(),
+  description: text("description"),
+  fieldsJson: text("fieldsJson").notNull(),
+  active: int("active").default(1).notNull(),
+  usageCount: int("usageCount").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const customerTickets = mysqlTable("customerTickets", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  customerId: int("customerId").notNull(),
+  equipmentId: int("equipmentId"),
+  externalId: varchar("externalId", { length: 80 }).notNull().unique(),
+  title: varchar("title", { length: 180 }).notNull(),
+  description: text("description"),
+  priority: mysqlEnum("priority", ["baixa", "media", "alta"]).default("media").notNull(),
+  status: mysqlEnum("status", ["novo", "em_triagem", "convertido_em_os", "cancelado"]).default("novo").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type WorkOrder = typeof workOrders.$inferSelect;
 export type InsertWorkOrder = typeof workOrders.$inferInsert;
+export type ServiceFormTemplate = typeof serviceFormTemplates.$inferSelect;
+export type CustomerTicket = typeof customerTickets.$inferSelect;

@@ -26,6 +26,14 @@ const sampleUser: AuthenticatedUser = {
   lastSignedIn: new Date(),
 };
 
+const fieldUser: AuthenticatedUser = {
+  ...sampleUser,
+  id: 8,
+  openId: "inovadoor-field-user",
+  role: "user",
+  accessProfile: "campo",
+};
+
 describe("Inovadoor Field Ops", () => {
   it("requires authentication for operational data", async () => {
     const caller = appRouter.createCaller(createContext());
@@ -50,5 +58,32 @@ describe("Inovadoor Field Ops", () => {
     const orders = await caller.workOrders.list();
     expect(Array.isArray(orders)).toBe(true);
     expect(orders.every(order => order.organizationId === 1)).toBe(true);
+  });
+
+  it("lists the new portal ticket and form resources", async () => {
+    const caller = appRouter.createCaller(createContext(sampleUser));
+    const [tickets, forms] = await Promise.all([
+      caller.customerTickets.list(),
+      caller.forms.list(),
+    ]);
+    expect(Array.isArray(tickets)).toBe(true);
+    expect(Array.isArray(forms)).toBe(true);
+  });
+
+  it("protects customer, equipment, third-party and form creation for managers", async () => {
+    const caller = appRouter.createCaller(createContext(fieldUser));
+    await expect(caller.customers.create({ name: "Cliente não permitido" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.equipment.create({ code: "EQ-TEST", name: "Equipamento não permitido" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.thirdParties.create({ name: "Terceiro não permitido" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.forms.create({ name: "Formulário não permitido", category: "atendimento", fields: ["Campo"] })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("validates a customer ticket before persistence", async () => {
+    const caller = appRouter.createCaller(createContext(sampleUser));
+    await expect(caller.customerTickets.create({
+      customerId: 1,
+      externalId: "CH-TEST-001",
+      title: "x",
+    })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });

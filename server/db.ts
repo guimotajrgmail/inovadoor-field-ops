@@ -2,9 +2,10 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   customers,
+  customerTickets,
   equipment,
   integrationConnections,
-  organizations,
+  serviceFormTemplates,
   teamMembers,
   thirdParties,
   users,
@@ -130,10 +131,57 @@ export async function listCustomers(organizationId: number) {
   return db.select().from(customers).where(eq(customers.organizationId, organizationId)).orderBy(customers.name);
 }
 
+export async function createCustomer(input: {
+  organizationId: number;
+  name: string;
+  document?: string;
+  city?: string;
+  state?: string;
+  address?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.insert(customers).values(input);
+  const rows = await db.select().from(customers).where(and(eq(customers.organizationId, input.organizationId), eq(customers.name, input.name))).orderBy(desc(customers.id)).limit(1);
+  return rows[0];
+}
+
 export async function listEquipment(organizationId: number) {
   const db = await getDb();
   if (!db || !organizationId) return [];
   return db.select().from(equipment).where(eq(equipment.organizationId, organizationId)).orderBy(desc(equipment.updatedAt));
+}
+
+export async function createEquipment(input: {
+  organizationId: number;
+  customerId?: number;
+  code: string;
+  name: string;
+  model?: string;
+  serialNumber?: string;
+  state?: "operacional" | "manutencao" | "atencao" | "baixado";
+  installedAt?: Date;
+  lastMaintenanceAt?: Date;
+  nextMaintenanceAt?: Date;
+  qrCode?: string;
+  notes?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.insert(equipment).values(input);
+  const rows = await db.select().from(equipment).where(eq(equipment.code, input.code)).limit(1);
+  return rows[0];
+}
+
+export async function linkEquipmentToCustomer(organizationId: number, equipmentId: number, customerId: number | null) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.update(equipment).set({ customerId, updatedAt: new Date() }).where(and(eq(equipment.id, equipmentId), eq(equipment.organizationId, organizationId)));
+  const rows = await db.select().from(equipment).where(and(eq(equipment.id, equipmentId), eq(equipment.organizationId, organizationId))).limit(1);
+  return rows[0];
 }
 
 export async function listTeamMembers(organizationId: number) {
@@ -146,6 +194,98 @@ export async function listThirdParties(organizationId: number) {
   const db = await getDb();
   if (!db || !organizationId) return [];
   return db.select().from(thirdParties).where(eq(thirdParties.organizationId, organizationId)).orderBy(thirdParties.name);
+}
+
+export async function createThirdParty(input: {
+  organizationId: number;
+  name: string;
+  document?: string;
+  region?: string;
+  contactName?: string;
+  contactEmail?: string;
+  status?: "homologado" | "em_revisao" | "bloqueado";
+  slaPercent?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.insert(thirdParties).values(input);
+  const rows = await db.select().from(thirdParties).where(and(eq(thirdParties.organizationId, input.organizationId), eq(thirdParties.name, input.name))).orderBy(desc(thirdParties.id)).limit(1);
+  return rows[0];
+}
+
+export async function listServiceFormTemplates(organizationId: number) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  return db.select().from(serviceFormTemplates).where(eq(serviceFormTemplates.organizationId, organizationId)).orderBy(desc(serviceFormTemplates.updatedAt));
+}
+
+export async function createServiceFormTemplate(input: {
+  organizationId: number;
+  name: string;
+  category: "atendimento" | "instalacao";
+  description?: string;
+  fieldsJson: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.insert(serviceFormTemplates).values(input);
+  const rows = await db.select().from(serviceFormTemplates).where(and(eq(serviceFormTemplates.organizationId, input.organizationId), eq(serviceFormTemplates.name, input.name))).orderBy(desc(serviceFormTemplates.id)).limit(1);
+  return rows[0];
+}
+
+export async function listCustomerTickets(organizationId: number, customerId?: number) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  const filters = customerId ? and(eq(customerTickets.organizationId, organizationId), eq(customerTickets.customerId, customerId)) : eq(customerTickets.organizationId, organizationId);
+  return db.select().from(customerTickets).where(filters).orderBy(desc(customerTickets.createdAt));
+}
+
+export async function createCustomerTicket(input: {
+  organizationId: number;
+  customerId: number;
+  equipmentId?: number;
+  externalId: string;
+  title: string;
+  description?: string;
+  priority?: "baixa" | "media" | "alta";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.insert(customerTickets).values(input);
+  const rows = await db.select().from(customerTickets).where(eq(customerTickets.externalId, input.externalId)).limit(1);
+  return rows[0];
+}
+
+export async function convertCustomerTicketToWorkOrder(input: {
+  organizationId: number;
+  ticketId: number;
+  externalId: string;
+  assignedMemberId?: number;
+  assignedThirdPartyId?: number;
+  scheduledAt?: Date;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const ticketRows = await db.select().from(customerTickets).where(and(eq(customerTickets.id, input.ticketId), eq(customerTickets.organizationId, input.organizationId))).limit(1);
+  const ticket = ticketRows[0];
+  if (!ticket) throw new Error("Customer ticket not found");
+  await db.insert(workOrders).values({
+    organizationId: input.organizationId,
+    customerId: ticket.customerId,
+    equipmentId: ticket.equipmentId ?? undefined,
+    assignedMemberId: input.assignedMemberId,
+    assignedThirdPartyId: input.assignedThirdPartyId,
+    externalId: input.externalId,
+    title: ticket.title,
+    serviceType: "Solicitação do cliente",
+    priority: ticket.priority,
+    status: "em_aprovacao",
+    scheduledAt: input.scheduledAt,
+    notes: ticket.description,
+  });
+  await db.update(customerTickets).set({ status: "convertido_em_os", updatedAt: new Date() }).where(and(eq(customerTickets.id, ticket.id), eq(customerTickets.organizationId, input.organizationId)));
+  const rows = await db.select().from(workOrders).where(eq(workOrders.externalId, input.externalId)).limit(1);
+  return rows[0];
 }
 
 export async function getIntegrationConnection(organizationId: number, provider: "monday" | "maps" | "email") {

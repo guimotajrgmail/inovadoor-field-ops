@@ -15,6 +15,13 @@
       "when": 1788145055782,
       "tag": "0001_premium_cassandra_nova",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1788147055882,
+      "tag": "0002_dark_rhodey",
+      "breakpoints": true
     }
   ]
 }
