@@ -9,7 +9,7 @@
 
 O primeiro fluxo operacional do Inovadoor Field Ops foi ampliado para cobrir o ciclo principal solicitado: o cliente abre um chamado no portal, a Gestão Inovadoor recebe a solicitação na fila de triagem e pode convertê-la em ordem de serviço; a equipe administra clientes, unidades, equipamentos, vínculos de ativos, terceiros e formulários padronizados de atendimento e instalação. A solução também mantém a experiência de execução em campo como PWA, com checklist, início e conclusão do atendimento.
 
-A interface atual funciona como uma demonstração operacional persistida no navegador, permitindo validar o fluxo visual sem depender de dados reais. Em paralelo, o backend recebeu as entidades e contratos tRPC protegidos necessários para a futura persistência multiusuário em banco. Essa separação torna possível testar a experiência imediatamente sem introduzir registros demonstrativos no banco compartilhado.
+A interface atual funciona como uma demonstração operacional persistida no navegador quando não há sessão, permitindo validar o fluxo visual sem depender de dados reais. Quando existe sessão autenticada, formulários, evidências e configurações de integração são enviados pelos contratos tRPC. Essa combinação permite testar a experiência imediatamente sem introduzir registros demonstrativos no banco compartilhado.
 
 ## Fluxos verificados
 
@@ -23,7 +23,7 @@ A interface atual funciona como uma demonstração operacional persistida no nav
 | Gestão de terceiros | Pronto | A Gestão cadastra parceiros, região, responsável, SLA e status de homologação. A OS pode ser atribuída a um terceiro. |
 | Formulário de atendimento | Pronto | Template com diagnóstico, peças, evidências fotográficas, assinatura e checklist. Pode ser vinculado a OS de manutenção. |
 | Formulário de instalação | Pronto | Template com conferência do local, fixação, nivelamento, testes, fotos e termo de aceite. |
-| Execução em campo | Pronto na experiência PWA | O técnico inicia o atendimento, percorre o checklist e finaliza o serviço para envio do relatório. |
+| Execução em campo | Pronto na experiência PWA | O técnico inicia o atendimento, percorre o checklist, registra GPS, captura fotos, coleta assinatura e finaliza o serviço para envio do relatório. |
 
 ## Experiência por perfil
 
@@ -42,8 +42,16 @@ O banco possui as entidades de organizações, usuários, pessoas, clientes, ter
 | Chamados | `customerTickets.list`, `customerTickets.create`, `customerTickets.convertToWorkOrder` |
 | Ordens de serviço | `workOrders.list`, `workOrders.create`, `workOrders.updateStatus` |
 | Integração | `integrations.monday.status`, `integrations.monday.connect` |
+| Acessos | `users.assignScope` para associar usuário à organização, cliente ou terceiro |
+| Webhook monday.com | `integrations.monday.webhook` valida e reconhece eventos recebidos |
 
-As mutações administrativas usam uma proteção de gestão: somente usuários administradores ou usuários com perfil `gestao` podem criar clientes, equipamentos, terceiros, formulários e OS. A abertura de chamado exige autenticação, e a conversão de chamado em OS fica restrita à Gestão. As consultas filtram a organização do usuário para evitar exposição de dados entre organizações.
+As mutações administrativas usam uma proteção de gestão: somente usuários administradores ou usuários com perfil `gestao` podem criar clientes, equipamentos, terceiros, formulários e OS. A abertura de chamado exige autenticação e, quando o perfil é `cliente`, o usuário só pode criar ou consultar chamados da própria unidade. Perfis de cliente e terceiro agora possuem associação explícita no usuário, e a conversão de chamado em OS fica restrita à Gestão. As consultas filtram a organização do usuário para evitar exposição de dados entre organizações.
+
+## Evidências, offline e integração
+
+O PWA captura fotos pelo dispositivo, registra a localização via Geolocation API e oferece um canvas para assinatura do cliente. As evidências são mantidas em uma fila local quando não há conexão ou sessão; ao reconectar, a fila tenta sincronizar automaticamente pelo procedimento `evidence.add`. No servidor, os bytes são enviados ao storage S3 compatível por `storagePut`, enquanto o banco guarda somente chave, URL, tipo, MIME, coordenadas e observações na tabela `workOrderEvidence`.
+
+A tela de integrações agora permite informar o Board ID, a direção de sincronização e o webhook de entrada do monday.com, validando que o endereço seja HTTPS. O salvamento usa `integrations.monday.connect` quando há sessão e mantém a configuração local no modo de demonstração, sem apresentar uma conexão como confirmada quando a persistência falha. A camada de backend reserva `settingsJson` para o mapeamento de campos, direção e endpoint de eventos, enquanto `integrations.monday.webhook` valida e reconhece o evento recebido.
 
 ## Validação técnica
 
@@ -52,7 +60,7 @@ A implementação foi validada com TypeScript, testes automatizados e build de p
 | Verificação | Resultado |
 |---|---|
 | `pnpm check` | Aprovado, sem erros TypeScript |
-| `pnpm test` | Aprovado: 7 testes em 2 arquivos |
+| `pnpm test` | Aprovado: 9 testes em 2 arquivos |
 | `pnpm build` | Aprovado, frontend e servidor compilados |
 | Preview do dashboard | Carregado com menu de Formulários e botão Abrir chamado |
 | Console após recarga | Sem saída de erro registrada |
@@ -62,13 +70,11 @@ Os testes cobrem autenticação obrigatória para dados operacionais, resumo tip
 
 ## Limitações atuais
 
-A interface entregue utiliza um estado demonstrativo persistido em `localStorage` para que o fluxo possa ser explorado imediatamente no preview, mesmo quando não existe uma sessão autenticada de banco disponível no navegador. O backend já possui o schema, a migração, helpers e contratos tRPC, mas a próxima etapa é substituir as mutações locais da interface por chamadas tRPC autenticadas, incluindo tratamento de loading, erros e atualização otimista.
-
-A integração monday.com está preparada no backend e na interface, porém ainda requer o mapeamento do board, dos campos e dos webhooks reais. GPS, fotos, assinatura digital e sincronização offline real também devem ser conectados aos serviços de produção antes do uso operacional definitivo.
+A interface entregue mantém um modo demonstrativo persistido em `localStorage` para funcionar imediatamente no preview sem sessão autenticada. Nas áreas que já possuem sincronização, a interface tenta usar tRPC quando há sessão e conserva fallback local quando não há. Antes do uso operacional definitivo, ainda é recomendável homologar credenciais, permissões e nomes de campos no board real do monday.com, além de definir a política de retenção das evidências.
 
 ## Conclusão
 
-O básico solicitado está pronto para validação funcional: o cliente consegue iniciar o ciclo por chamado, a Inovadoor consegue organizar o atendimento, os ativos são vinculados às unidades, terceiros podem ser gerenciados e os formulários de atendimento e instalação já fazem parte do processo de OS e campo. O produto está em condição adequada para a próxima fase de integração da interface com o backend autenticado e de homologação com usuários reais da operação.
+O básico solicitado está pronto para validação funcional: o cliente consegue iniciar o ciclo por chamado, a Inovadoor consegue organizar o atendimento, os ativos são vinculados às unidades, terceiros podem ser gerenciados, os formulários de atendimento e instalação fazem parte do processo de OS e campo e o PWA captura evidências com suporte offline. O produto está em condição adequada para homologação com usuários reais e configuração dos boards e credenciais de produção.
 
 ## Referências
 

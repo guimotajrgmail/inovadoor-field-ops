@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { trpc } from "@/lib/trpc";
 import {
   Activity,
   ArrowDownRight,
   ArrowUpRight,
   Bell,
   Boxes,
+  Camera,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -25,10 +27,12 @@ import {
   LayoutDashboard,
   Link2,
   LogOut,
+  LocateFixed,
   MapPin,
   Menu,
   PackageCheck,
   PanelLeft,
+  PenLine,
   Plus,
   QrCode,
   Route,
@@ -69,6 +73,7 @@ type Person = { id: string; name: string; area: string; profile: string; last: s
 type WorkOrder = { id: string; customerId: string; equipmentId: string; title: string; type: string; responsible: string; thirdPartyId: string; formId: string; status: string; statusKey: string; priority: "Alta" | "Média" | "Baixa"; scheduled: string; source: "gestao" | "cliente" };
 type ServiceForm = { id: string; name: string; category: "Atendimento" | "Instalação"; description: string; fields: string[]; used: number; updated: string };
 type Ticket = { id: string; customerId: string; equipmentId: string; title: string; description: string; priority: "Alta" | "Média" | "Baixa"; status: "Novo" | "Em triagem" | "Convertido em OS"; created: string };
+type EvidencePayload = { type: "foto" | "assinatura"; fileName: string; mimeType: string; dataUrl: string; latitude?: string; longitude?: string };
 
 type DemoStore = {
   customers: Customer[];
@@ -201,7 +206,17 @@ function PeoplePage({ store, onAdd }: { store: DemoStore; onAdd: () => void }) {
 }
 
 function FormsPage({ store, onAdd, onPreview }: { store: DemoStore; onAdd: () => void; onPreview: (form: ServiceForm) => void }) {
-  return <><SectionHeading eyebrow="Padronização operacional" title="Formulários de atendimento" description="Gere templates para manutenção, instalação e inspeção e vincule-os às OS." action={<button onClick={onAdd} className="hidden items-center gap-2 rounded-xl bg-[#f36f21] px-4 py-2.5 text-sm font-semibold text-white sm:flex"><FilePlus2 className="h-4 w-4" />Novo formulário</button>} /><div className="grid gap-4 sm:grid-cols-3"><StatCard label="Templates ativos" value={String(store.forms.length)} detail="Atendimento e instalação" icon={ClipboardList} tone="bg-blue-50 text-blue-700" /><StatCard label="Respostas este mês" value="159" detail="Registros enviados pelo PWA" icon={FileCheck2} tone="bg-emerald-50 text-emerald-700" /><StatCard label="Campos obrigatórios" value="18" detail="Com validação de encerramento" icon={ShieldCheck} tone="bg-orange-50 text-orange-700" /></div><div className="mt-6 grid gap-4 lg:grid-cols-2">{store.forms.map(form => <div key={form.id} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)] sm:p-6"><div className="flex items-start justify-between gap-4"><div className={cx("flex h-11 w-11 items-center justify-center rounded-xl", form.category === "Instalação" ? "bg-orange-50 text-orange-600" : "bg-blue-50 text-blue-600")}><ClipboardCheck className="h-5 w-5" /></div><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">Ativo</span></div><h2 className="mt-4 font-display text-base font-bold text-slate-900">{form.name}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{form.description}</p><div className="mt-4 flex flex-wrap gap-1.5">{form.fields.map(field => <span key={field} className="rounded-lg bg-slate-50 px-2 py-1 text-[10px] font-medium text-slate-600">{field}</span>)}</div><div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4"><span className="text-[11px] text-slate-400">Usado em {form.used} OS · atualizado {form.updated}</span><button onClick={() => onPreview(form)} className="inline-flex items-center gap-1 text-xs font-bold text-orange-600">Abrir template <ArrowUpRight className="h-3.5 w-3.5" /></button></div></div>)}</div></>;
+  const remoteForms = trpc.forms.list.useQuery(undefined, { enabled: Boolean(window.sessionStorage.getItem("manus-cookie")), retry: false });
+  const displayForms: ServiceForm[] = remoteForms.data?.map(form => ({
+    id: String(form.id),
+    name: form.name,
+    category: form.category === "instalacao" ? "Instalação" : "Atendimento",
+    description: form.description || "Template operacional Inovadoor.",
+    fields: (() => { try { return JSON.parse(form.fieldsJson || "[]") as string[]; } catch { return []; } })(),
+    used: 0,
+    updated: "Sincronizado agora",
+  })) ?? store.forms;
+  return <><SectionHeading eyebrow="Padronização operacional" title="Formulários de atendimento" description="Gere templates para manutenção, instalação e inspeção e vincule-os às OS." action={<button onClick={onAdd} className="hidden items-center gap-2 rounded-xl bg-[#f36f21] px-4 py-2.5 text-sm font-semibold text-white sm:flex"><FilePlus2 className="h-4 w-4" />Novo formulário</button>} /><div className="grid gap-4 sm:grid-cols-3"><StatCard label="Templates ativos" value={String(displayForms.length)} detail="Atendimento e instalação" icon={ClipboardList} tone="bg-blue-50 text-blue-700" /><StatCard label="Respostas este mês" value="159" detail="Registros enviados pelo PWA" icon={FileCheck2} tone="bg-emerald-50 text-emerald-700" /><StatCard label="Campos obrigatórios" value="18" detail="Com validação de encerramento" icon={ShieldCheck} tone="bg-orange-50 text-orange-700" /></div><div className="mt-6 grid gap-4 lg:grid-cols-2">{displayForms.map(form => <div key={form.id} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)] sm:p-6"><div className="flex items-start justify-between gap-4"><div className={cx("flex h-11 w-11 items-center justify-center rounded-xl", form.category === "Instalação" ? "bg-orange-50 text-orange-600" : "bg-blue-50 text-blue-600")}><ClipboardCheck className="h-5 w-5" /></div><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">Ativo</span></div><h2 className="mt-4 font-display text-base font-bold text-slate-900">{form.name}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{form.description}</p><div className="mt-4 flex flex-wrap gap-1.5">{form.fields.map(field => <span key={field} className="rounded-lg bg-slate-50 px-2 py-1 text-[10px] font-medium text-slate-600">{field}</span>)}</div><div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4"><span className="text-[11px] text-slate-400">Usado em {form.used} OS · atualizado {form.updated}</span><button onClick={() => onPreview(form)} className="inline-flex items-center gap-1 text-xs font-bold text-orange-600">Abrir template <ArrowUpRight className="h-3.5 w-3.5" /></button></div></div>)}</div></>;
 }
 
 function CalendarPage({ store, onAdd }: { store: DemoStore; onAdd: () => void }) {
@@ -219,15 +234,165 @@ function ReportsPage() {
   return <><SectionHeading eyebrow="Inteligência operacional" title="Relatórios e indicadores" description="Decisões mais rápidas com dados confiáveis da operação." action={<button className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 sm:flex"><FileText className="h-4 w-4" />Exportar relatório</button>} /><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><StatCard label="Tempo médio em campo" value="2h18" detail="-14 min vs. mês anterior" icon={Clock3} tone="bg-blue-50 text-blue-700" trend="up" /><StatCard label="Primeiro atendimento" value="78%" detail="Meta: 80%" icon={CheckCircle2} tone="bg-emerald-50 text-emerald-700" /><StatCard label="Avaliação média" value="4,7 / 5" detail="186 respostas" icon={Sparkles} tone="bg-amber-50 text-amber-700" trend="up" /><StatCard label="Custo por OS" value="R$ 184" detail="-6,8% no trimestre" icon={ArrowDownRight} tone="bg-violet-50 text-violet-700" /></div><div className="mt-6 grid gap-6 lg:grid-cols-2"><div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6"><div className="mb-6"><h2 className="font-display text-base font-bold text-slate-950">Conclusão por tipo de serviço</h2><p className="mt-1 text-xs text-slate-400">Últimos 30 dias</p></div>{[{ label: "Manutenção preventiva", value: 86, color: "bg-blue-500" }, { label: "Manutenção corretiva", value: 72, color: "bg-orange-500" }, { label: "Instalação", value: 64, color: "bg-emerald-500" }, { label: "Inspeção de segurança", value: 91, color: "bg-violet-500" }].map(row => <div key={row.label} className="mb-5 last:mb-0"><div className="mb-2 flex justify-between text-xs"><span className="font-medium text-slate-600">{row.label}</span><span className="font-bold text-slate-800">{row.value}%</span></div><div className="h-2 rounded-full bg-slate-100"><div className={cx("h-full rounded-full", row.color)} style={{ width: `${row.value}%` }} /></div></div>)}</div><div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6"><div className="mb-6"><h2 className="font-display text-base font-bold text-slate-950">Demanda por região</h2><p className="mt-1 text-xs text-slate-400">Distribuição de OS no Paraná</p></div><div className="flex h-48 items-end gap-4 border-b border-slate-100 px-3">{[{ label: "CWB", value: 92 }, { label: "ARA", value: 68 }, { label: "SJP", value: 84 }, { label: "PIN", value: 56 }, { label: "COL", value: 41 }, { label: "OUT", value: 29 }].map((bar, i) => <div key={bar.label} className="flex flex-1 flex-col items-center gap-2"><span className="text-[10px] font-semibold text-slate-500">{bar.value}</span><div className={cx("w-full max-w-9 rounded-t-lg", i === 0 ? "bg-orange-500" : "bg-orange-100")} style={{ height: `${bar.value * 1.35}px` }} /><span className="text-[10px] font-medium text-slate-400">{bar.label}</span></div>)}</div></div></div></>;
 }
 
-function IntegrationsPage() {
-  const [connected, setConnected] = useState(false);
-  return <><SectionHeading eyebrow="Conectividade" title="Integrações" description="Centralize o fluxo da Inovadoor com suas ferramentas de trabalho." /><div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(300px,.8fr)]"><div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)] sm:p-6"><div className="flex items-start gap-4"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f4f1ff] text-[#6155c7]"><Boxes className="h-6 w-6" /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="font-display text-lg font-bold text-slate-950">monday.com</h2><span className={cx("rounded-full px-2.5 py-1 text-[10px] font-bold", connected ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")}>{connected ? "Conectado" : "Configuração pendente"}</span></div><p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">Sincronize clientes, ordens de serviço, prazos e status entre o monday.com e a operação de campo Inovadoor.</p></div></div><div className="mt-6 grid gap-3 sm:grid-cols-3">{[{ icon: Cloud, label: "Clientes", value: "Bidirecional" }, { icon: FileText, label: "Ordens de serviço", value: "Em tempo real" }, { icon: Activity, label: "Status e SLA", value: "Automático" }].map(item => <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3"><item.icon className="h-4 w-4 text-slate-500" /><p className="mt-3 text-xs font-semibold text-slate-700">{item.label}</p><p className="mt-1 text-[10px] text-emerald-600">{item.value}</p></div>)}</div><div className="mt-6 rounded-xl border border-dashed border-slate-200 p-4"><div className="flex items-center justify-between gap-4"><div><p className="text-xs font-bold text-slate-700">Chave de API do workspace</p><p className="mt-1 text-[11px] text-slate-400">A credencial fica protegida no servidor.</p></div><button onClick={() => setConnected(true)} className="rounded-xl bg-[#f36f21] px-3.5 py-2 text-xs font-semibold text-white">{connected ? "Configuração salva" : "Conectar workspace"}</button></div><div className="mt-4 flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-400"><span className="flex-1">••••••••••••••••••••••••••</span><Copy className="h-3.5 w-3.5" /></div></div></div><div className="rounded-2xl border border-slate-200/80 bg-[#0d1d2e] p-5 text-white shadow-[0_12px_40px_rgba(15,23,42,0.13)] sm:p-6"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-400/10 text-orange-300"><Link2 className="h-5 w-5" /></div><h2 className="mt-5 font-display text-lg font-bold">Fluxos preparados</h2><p className="mt-2 text-sm leading-6 text-slate-300">A camada de integração foi desenhada para receber webhooks, sincronização programada e mapeamento de campos.</p><div className="mt-6 space-y-3">{["Criar OS a partir de item no monday", "Enviar relatório após conclusão", "Atualizar SLA e responsável", "Registrar erros e reprocessamentos"].map((item, i) => <div key={item} className="flex items-center gap-2.5 text-xs text-slate-300"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-300">{i < 2 ? <Check className="h-3 w-3" /> : <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />}</span>{item}</div>)}</div><button className="mt-7 text-xs font-semibold text-orange-300">Ver documentação da API <ArrowUpRight className="ml-1 inline h-3.5 w-3.5" /></button></div></div></>;
+function IntegrationsPage({ onPersist }: { onPersist: (config: { workspaceId: string; settingsJson: string }) => Promise<boolean> }) {
+  const [connected, setConnected] = useState(() => window.localStorage.getItem("inovadoor-monday-connected") === "true");
+  const [boardId, setBoardId] = useState(() => window.localStorage.getItem("inovadoor-monday-board") || "123456789");
+  const [direction, setDirection] = useState(() => window.localStorage.getItem("inovadoor-monday-direction") || "bidirecional");
+  const [webhookUrl, setWebhookUrl] = useState(() => window.localStorage.getItem("inovadoor-monday-webhook") || "https://inovafield-3zs6fpc2.manus.space/api/monday/webhook");
+  const [saved, setSaved] = useState(false);
+  const saveMapping = async () => {
+    if (!webhookUrl.startsWith("https://")) return;
+    const persisted = await onPersist({ workspaceId: boardId, settingsJson: JSON.stringify({ direction, webhookUrl }) });
+    window.localStorage.setItem("inovadoor-monday-connected", persisted ? "true" : "false");
+    window.localStorage.setItem("inovadoor-monday-board", boardId);
+    window.localStorage.setItem("inovadoor-monday-direction", direction);
+    window.localStorage.setItem("inovadoor-monday-webhook", webhookUrl);
+    setConnected(persisted);
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 2500);
+  };
+  return <><SectionHeading eyebrow="Conectividade" title="Integrações" description="Centralize o fluxo da Inovadoor com suas ferramentas de trabalho." /><div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(300px,.8fr)]"><div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)] sm:p-6"><div className="flex items-start gap-4"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f4f1ff] text-[#6155c7]"><Boxes className="h-6 w-6" /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="font-display text-lg font-bold text-slate-950">monday.com</h2><span className={cx("rounded-full px-2.5 py-1 text-[10px] font-bold", connected ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")}>{connected ? "Conectado" : "Configuração pendente"}</span></div><p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">Sincronize clientes, ordens de serviço, prazos e status entre o monday.com e a operação de campo Inovadoor.</p></div></div><div className="mt-6 grid gap-3 sm:grid-cols-3">{[{ icon: Cloud, label: "Clientes", value: "Bidirecional" }, { icon: FileText, label: "Ordens de serviço", value: "Em tempo real" }, { icon: Activity, label: "Status e SLA", value: "Automático" }].map(item => <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3"><item.icon className="h-4 w-4 text-slate-500" /><p className="mt-3 text-xs font-semibold text-slate-700">{item.label}</p><p className="mt-1 text-[10px] text-emerald-600">{item.value}</p></div>)}</div><div className="mt-6 grid gap-3 rounded-xl border border-slate-200 p-4 sm:grid-cols-2"><InputField label="Board ID" value={boardId} onChange={value => setBoardId(value)} placeholder="Ex.: 123456789" /><SelectField label="Direção da sincronização" value={direction} onChange={value => setDirection(value)} options={[{ value: "bidirecional", label: "Bidirecional" }, { value: "monday-para-inovadoor", label: "monday → Inovadoor" }, { value: "inovadoor-para-monday", label: "Inovadoor → monday" }]} /><div className="sm:col-span-2"><InputField label="Webhook de entrada" value={webhookUrl} onChange={value => setWebhookUrl(value)} placeholder="https://.../api/monday/webhook" /></div><div className="flex items-center gap-2 sm:col-span-2"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600"><ShieldCheck className="h-4 w-4" /></span><p className="flex-1 text-[11px] leading-5 text-slate-500">O token fica protegido no servidor; o board, direção e webhook são mantidos como configuração do workspace.</p><button onClick={saveMapping} className="rounded-xl bg-[#f36f21] px-3.5 py-2 text-xs font-semibold text-white">{saved ? "Mapeamento salvo" : "Salvar mapeamento"}</button></div></div><div className="mt-4 rounded-xl border border-dashed border-slate-200 p-4"><div className="flex items-center justify-between gap-4"><div><p className="text-xs font-bold text-slate-700">Chave de API do workspace</p><p className="mt-1 text-[11px] text-slate-400">A credencial fica protegida no servidor.</p></div><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700">Nunca exibida</span></div><div className="mt-4 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-400"><span className="flex-1">••••••••••••••••••••••••••</span><Copy className="h-3.5 w-3.5" /></div></div></div><div className="rounded-2xl border border-slate-200/80 bg-[#0d1d2e] p-5 text-white shadow-[0_12px_40px_rgba(15,23,42,0.13)] sm:p-6"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-400/10 text-orange-300"><Link2 className="h-5 w-5" /></div><h2 className="mt-5 font-display text-lg font-bold">Fluxos preparados</h2><p className="mt-2 text-sm leading-6 text-slate-300">O mapeamento salvo prepara board, direção e webhook para receber sincronização programada e eventos do monday.com.</p><div className="mt-6 space-y-3">{["Criar OS a partir de item no monday", "Enviar relatório após conclusão", "Atualizar SLA e responsável", "Registrar erros e reprocessamentos"].map((item, i) => <div key={item} className="flex items-center gap-2.5 text-xs text-slate-300"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-300">{i < 2 ? <Check className="h-3 w-3" /> : <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />}</span>{item}</div>)}</div><button onClick={() => setSaved(true)} className="mt-7 text-xs font-semibold text-orange-300">Ver documentação da API <ArrowUpRight className="ml-1 inline h-3.5 w-3.5" /></button></div></div></>;
 }
 
-function FieldPwa({ onExit }: { onExit: () => void }) {
+function FieldPwa({ onExit, onEvidence }: { onExit: () => void; onEvidence?: (payload: EvidencePayload) => Promise<boolean> }) {
   const [started, setStarted] = useState(false);
   const [completed, setCompleted] = useState(false);
-  return <div className="mx-auto min-h-[calc(100vh-5rem)] max-w-md overflow-hidden rounded-[30px] border border-slate-200 bg-[#f4f7fb] shadow-[0_20px_60px_rgba(15,23,42,.12)]"><div className="bg-[#0d1d2e] px-5 pb-6 pt-5 text-white"><div className="flex items-center justify-between"><button onClick={onExit} className="rounded-lg p-1.5 text-slate-300 hover:bg-white/10"><PanelLeft className="h-5 w-5" /></button><div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-400" /><span className="text-[11px] font-semibold text-slate-300">Online</span></div><button className="rounded-lg p-1.5 text-slate-300 hover:bg-white/10"><Bell className="h-4 w-4" /></button></div><div className="mt-7"><p className="text-xs text-slate-400">Segunda-feira, 31 de agosto</p><h1 className="mt-1 font-display text-2xl font-bold">Olá, Marcos.</h1><p className="mt-2 text-xs text-slate-300">Você tem 3 atividades para hoje.</p></div><div className="mt-5 flex gap-2"><div className="flex-1 rounded-xl bg-white/10 p-3"><p className="text-[10px] text-slate-400">Hoje</p><p className="mt-1 text-xl font-bold">03</p></div><div className="flex-1 rounded-xl bg-white/10 p-3"><p className="text-[10px] text-slate-400">Concluídas</p><p className="mt-1 text-xl font-bold">01</p></div><div className="flex-1 rounded-xl bg-orange-400/15 p-3"><p className="text-[10px] text-orange-200">Em aberto</p><p className="mt-1 text-xl font-bold text-orange-200">02</p></div></div></div><div className="space-y-4 p-4"><div className="flex items-center justify-between"><h2 className="font-display text-sm font-bold text-slate-800">Próxima atividade</h2><button className="text-xs font-semibold text-orange-600">Ver agenda</button></div><div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm"><div className="flex items-start justify-between"><div><span className="rounded-full bg-orange-50 px-2 py-1 text-[10px] font-bold text-orange-700">OS-2026-0842</span><h3 className="mt-3 text-base font-bold text-slate-800">FrioSul Distribuição</h3><p className="mt-1 text-xs text-slate-500">Manutenção corretiva · Porta rápida</p></div><span className="text-xs font-bold text-slate-500">09:30</span></div><div className="mt-4 flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600"><MapPin className="h-4 w-4 text-orange-600" /><span className="flex-1">Rua Joinville, 1840 · Araucária</span><ChevronRight className="h-4 w-4 text-slate-300" /></div><div className="mt-4 grid grid-cols-2 gap-2"><button className="rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-600">Abrir rota</button><button onClick={() => setStarted(true)} className={cx("rounded-xl py-2.5 text-xs font-semibold", started ? "bg-emerald-500 text-white" : "bg-[#f36f21] text-white")}>{started ? "Atendimento iniciado" : "Iniciar atendimento"}</button></div></div><h2 className="pt-2 font-display text-sm font-bold text-slate-800">Checklist de execução</h2><div className="space-y-2">{["Conferir identificação do equipamento", "Testar sensores de segurança", "Registrar evidências fotográficas", "Coletar assinatura do cliente"].map((item, i) => <div key={item} className="flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white p-3"><span className={cx("flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold", i < (started ? 2 : 1) ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400")}>{i < (started ? 2 : 1) ? <Check className="h-3.5 w-3.5" /> : i + 1}</span><span className="flex-1 text-xs font-medium text-slate-600">{item}</span><ChevronRight className="h-3.5 w-3.5 text-slate-300" /></div>)}</div>{started && <button onClick={() => setCompleted(true)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0d1d2e] py-3 text-xs font-bold text-white">{completed ? <><CheckCircle2 className="h-4 w-4 text-emerald-300" />OS concluída com sucesso</> : <>Finalizar e enviar relatório <ArrowUpRight className="h-4 w-4" /></>}</button>}<div className="flex items-center justify-center gap-2 pt-2 text-[10px] text-slate-400"><Cloud className="h-3.5 w-3.5 text-emerald-500" />Dados sincronizados automaticamente</div></div></div>;
+  const [isOffline, setIsOffline] = useState(() => typeof navigator !== "undefined" && !navigator.onLine);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [signatureReady, setSignatureReady] = useState(false);
+  const [pendingEvidence, setPendingEvidence] = useState<EvidencePayload[]>(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem("inovadoor-field-evidence-pending") || "[]") as EvidencePayload[];
+    } catch {
+      return [];
+    }
+  });
+  const signatureCanvas = useRef<HTMLCanvasElement>(null);
+  const drawing = useRef(false);
+  const onEvidenceRef = useRef(onEvidence);
+
+  useEffect(() => {
+    onEvidenceRef.current = onEvidence;
+  }, [onEvidence]);
+
+  useEffect(() => {
+    const goOnline = () => setIsOffline(false);
+    const goOffline = () => setIsOffline(true);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
+
+  const queueEvidence = (payload: EvidencePayload) => {
+    setPendingEvidence(current => {
+      const next = [...current, payload];
+      window.localStorage.setItem("inovadoor-field-evidence-pending", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const sendEvidence = async (payload: EvidencePayload) => {
+    if (!isOffline && onEvidence) {
+      const sent = await onEvidence(payload);
+      if (sent) return;
+    }
+    queueEvidence(payload);
+  };
+
+  useEffect(() => {
+    if (isOffline || !onEvidenceRef.current || pendingEvidence.length === 0) return;
+    const syncHandler = onEvidenceRef.current;
+    let cancelled = false;
+    const synchronize = async () => {
+      const remaining: EvidencePayload[] = [];
+      for (const payload of pendingEvidence) {
+        if (!(await syncHandler(payload))) remaining.push(payload);
+      }
+      if (!cancelled) {
+        setPendingEvidence(remaining);
+        window.localStorage.setItem("inovadoor-field-evidence-pending", JSON.stringify(remaining));
+      }
+    };
+    void synchronize();
+    return () => { cancelled = true; };
+  }, [isOffline, pendingEvidence.length]);
+
+  const captureLocation = () => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        setLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+        setLocating(false);
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 },
+    );
+  };
+
+  const capturePhoto = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      setPhotos(current => [...current, dataUrl]);
+      void sendEvidence({ type: "foto", fileName: file.name, mimeType: file.type || "image/jpeg", dataUrl, latitude: location ? String(location.latitude) : undefined, longitude: location ? String(location.longitude) : undefined });
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  };
+
+  const canvasPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = signatureCanvas.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    return { x: (event.clientX - rect.left) * (canvas.width / rect.width), y: (event.clientY - rect.top) * (canvas.height / rect.height) };
+  };
+  const beginSignature = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = signatureCanvas.current;
+    const point = canvasPoint(event);
+    if (!canvas || !point) return;
+    drawing.current = true;
+    canvas.setPointerCapture(event.pointerId);
+    const context = canvas.getContext("2d");
+    if (context) {
+      context.beginPath();
+      context.moveTo(point.x, point.y);
+      context.strokeStyle = "#0d1d2e";
+      context.lineWidth = 3;
+      context.lineCap = "round";
+    }
+  };
+  const drawSignature = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawing.current) return;
+    const point = canvasPoint(event);
+    const context = signatureCanvas.current?.getContext("2d");
+    if (point && context) {
+      context.lineTo(point.x, point.y);
+      context.stroke();
+      setSignatureReady(true);
+    }
+  };
+  const endSignature = () => {
+    if (drawing.current && signatureReady) {
+      const dataUrl = signatureCanvas.current?.toDataURL("image/png");
+      if (dataUrl) void sendEvidence({ type: "assinatura", fileName: "assinatura-cliente.png", mimeType: "image/png", dataUrl, latitude: location ? String(location.latitude) : undefined, longitude: location ? String(location.longitude) : undefined });
+    }
+    drawing.current = false;
+  };
+  const clearSignature = () => {
+    const canvas = signatureCanvas.current;
+    canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+    setSignatureReady(false);
+  };
+
+  return <div className="mx-auto min-h-[calc(100vh-5rem)] max-w-md overflow-hidden rounded-[30px] border border-slate-200 bg-[#f4f7fb] shadow-[0_20px_60px_rgba(15,23,42,.12)]"><div className="bg-[#0d1d2e] px-5 pb-6 pt-5 text-white"><div className="flex items-center justify-between"><button onClick={onExit} className="rounded-lg p-1.5 text-slate-300 hover:bg-white/10"><PanelLeft className="h-5 w-5" /></button><div className="flex items-center gap-2"><span className={cx("h-2 w-2 rounded-full", isOffline ? "bg-amber-400" : "bg-emerald-400")} /><span className="text-[11px] font-semibold text-slate-300">{isOffline ? "Offline" : "Online"}</span></div><button className="rounded-lg p-1.5 text-slate-300 hover:bg-white/10"><Bell className="h-4 w-4" /></button></div><div className="mt-7"><p className="text-xs text-slate-400">Segunda-feira, 31 de agosto</p><h1 className="mt-1 font-display text-2xl font-bold">Olá, Marcos.</h1><p className="mt-2 text-xs text-slate-300">Você tem 3 atividades para hoje.</p></div><div className="mt-5 flex gap-2"><div className="flex-1 rounded-xl bg-white/10 p-3"><p className="text-[10px] text-slate-400">Hoje</p><p className="mt-1 text-xl font-bold">03</p></div><div className="flex-1 rounded-xl bg-white/10 p-3"><p className="text-[10px] text-slate-400">Concluídas</p><p className="mt-1 text-xl font-bold">01</p></div><div className="flex-1 rounded-xl bg-orange-400/15 p-3"><p className="text-[10px] text-orange-200">Em aberto</p><p className="mt-1 text-xl font-bold text-orange-200">02</p></div></div></div><div className="space-y-4 p-4"><div className="flex items-center justify-between"><h2 className="font-display text-sm font-bold text-slate-800">Próxima atividade</h2><button className="text-xs font-semibold text-orange-600">Ver agenda</button></div><div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm"><div className="flex items-start justify-between"><div><span className="rounded-full bg-orange-50 px-2 py-1 text-[10px] font-bold text-orange-700">OS-2026-0842</span><h3 className="mt-3 text-base font-bold text-slate-800">FrioSul Distribuição</h3><p className="mt-1 text-xs text-slate-500">Manutenção corretiva · Porta rápida</p></div><span className="text-xs font-bold text-slate-500">09:30</span></div><div className="mt-4 flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600"><MapPin className="h-4 w-4 text-orange-600" /><span className="flex-1">Rua Joinville, 1840 · Araucária</span><button onClick={captureLocation} className="rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-orange-600" title="Registrar GPS">{locating ? <Activity className="h-4 w-4 animate-pulse" /> : <LocateFixed className="h-4 w-4" />}</button></div>{location && <p className="mt-2 text-[10px] font-medium text-emerald-600">GPS registrado: {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}</p>}<div className="mt-4 grid grid-cols-2 gap-2"><button className="rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-600">Abrir rota</button><button onClick={() => setStarted(true)} className={cx("rounded-xl py-2.5 text-xs font-semibold", started ? "bg-emerald-500 text-white" : "bg-[#f36f21] text-white")}>{started ? "Atendimento iniciado" : "Iniciar atendimento"}</button></div></div><h2 className="pt-2 font-display text-sm font-bold text-slate-800">Checklist de execução</h2><div className="space-y-2">{["Conferir identificação do equipamento", "Testar sensores de segurança", "Registrar evidências fotográficas", "Coletar assinatura do cliente"].map((item, i) => <div key={item} className="flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white p-3"><span className={cx("flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold", i < (started ? 2 : 1) ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400")}>{i < (started ? 2 : 1) ? <Check className="h-3.5 w-3.5" /> : i + 1}</span><span className="flex-1 text-xs font-medium text-slate-600">{item}</span><ChevronRight className="h-3.5 w-3.5 text-slate-300" /></div>)}</div>{started && <><div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center justify-between"><div><h3 className="text-xs font-bold text-slate-700">Evidências do atendimento</h3><p className="mt-1 text-[10px] text-slate-400">Fotos ficam na fila offline e são enviadas quando houver conexão.</p></div><label className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-orange-50 px-3 py-2 text-[10px] font-bold text-orange-700"><Camera className="h-3.5 w-3.5" />Adicionar foto<input type="file" accept="image/*" capture="environment" onChange={capturePhoto} className="hidden" /></label></div>{photos.length > 0 && <div className="mt-3 flex gap-2">{photos.map((photo, index) => <img key={index} src={photo} alt={`Evidência ${index + 1}`} className="h-14 w-14 rounded-lg object-cover ring-1 ring-slate-200" />)}</div>}<div className="mt-4 flex items-center justify-between"><span className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-500"><LocateFixed className="h-3.5 w-3.5 text-emerald-500" />{location ? "GPS anexado" : "Registre o GPS acima"}</span><span className="text-[10px] font-semibold text-slate-400">{pendingEvidence.length} na fila</span></div></div><div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center justify-between"><div><h3 className="text-xs font-bold text-slate-700">Assinatura do cliente</h3><p className="mt-1 text-[10px] text-slate-400">Desenhe no quadro para registrar o aceite.</p></div><button onClick={clearSignature} className="text-[10px] font-bold text-slate-400">Limpar</button></div><canvas ref={signatureCanvas} width={600} height={180} onPointerDown={beginSignature} onPointerMove={drawSignature} onPointerUp={endSignature} onPointerLeave={endSignature} className="mt-3 h-24 w-full touch-none rounded-xl border border-dashed border-slate-200 bg-slate-50" />{signatureReady && <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-emerald-600"><Check className="h-3 w-3" />Assinatura capturada</p>}</div><button onClick={() => setCompleted(true)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0d1d2e] py-3 text-xs font-bold text-white">{completed ? <><CheckCircle2 className="h-4 w-4 text-emerald-300" />OS concluída com sucesso</> : <>Finalizar e enviar relatório <Send className="h-4 w-4" /></>}</button></>}<div className="flex items-center justify-center gap-2 pt-2 text-[10px] text-slate-400"><Cloud className="h-3.5 w-3.5 text-emerald-500" />{isOffline ? "Salvo no dispositivo para sincronizar" : "Dados sincronizados automaticamente"}</div></div></div>;
 }
 
 function ClientPortal({ store, onExit, onOpenTicket }: { store: DemoStore; onExit: () => void; onOpenTicket: () => void }) {
@@ -262,6 +427,9 @@ function FormPreview({ form, onClose }: { form: ServiceForm; onClose: () => void
 }
 
 export default function Home() {
+  const createFormMutation = trpc.forms.create.useMutation();
+  const addEvidenceMutation = trpc.evidence.add.useMutation();
+  const mondayConnectionMutation = trpc.integrations.monday.connect.useMutation();
   const [activeRole, setActiveRole] = useState<RoleKey>("gestao");
   const [activeSection, setActiveSection] = useState<SectionKey>("visao");
   const [showLogin, setShowLogin] = useState(false);
@@ -323,13 +491,28 @@ export default function Home() {
       const fields = (payload.fields || "Fotos, assinatura, checklist").split(",").map(field => field.trim()).filter(Boolean);
       const form: ServiceForm = { id: makeId("form"), name: payload.name || "Novo formulário", category: (payload.category as ServiceForm["category"]) || "Atendimento", description: payload.description || "Template configurado pela Gestão Inovadoor.", fields, used: 0, updated: "Agora" };
       setStore(current => ({ ...current, forms: [form, ...current.forms] }));
+      try {
+        if (window.sessionStorage.getItem("manus-cookie")) {
+          createFormMutation.mutate({ name: form.name, category: form.category === "Instalação" ? "instalacao" : "atendimento", description: form.description, fields }, { onError: () => undefined });
+        }
+      } catch {
+        // O modo demonstrativo continua funcionando quando não há sessão.
+      }
       setToast("Formulário gerado e disponível para novas OS.");
     }
     setModal(null);
   };
 
   if (showLogin) return <LoginPanel role={activeRole} setRole={setActiveRole} onEnter={() => { setShowLogin(false); if (activeRole === "campo") return; if (activeRole === "cliente") return; setActiveSection(activeRole === "pessoas" ? "pessoas" : activeRole === "terceiros" ? "terceiros" : "visao"); setToast(`Acesso iniciado: ${roles.find(role => role.key === activeRole)?.label}`); }} />;
-  if (activeRole === "campo") return <FieldPwa onExit={() => setShowLogin(true)} />;
+  if (activeRole === "campo") return <FieldPwa onExit={() => setShowLogin(true)} onEvidence={async payload => {
+    try {
+      if (!window.sessionStorage.getItem("manus-cookie")) return false;
+      await addEvidenceMutation.mutateAsync({ workOrderExternalId: "OS-2026-0842", ...payload });
+      return true;
+    } catch {
+      return false;
+    }
+  }} />;
   if (activeRole === "cliente") return <ClientPortal store={store} onExit={() => setShowLogin(true)} onOpenTicket={() => openModal("ticket")} />;
 
   const renderSection = () => {
@@ -344,7 +527,15 @@ export default function Home() {
       case "terceiros": return <ThirdPartiesPage store={store} onAdd={() => openModal("thirdParty")} />;
       case "estoque": return <StockPage onAdd={() => setToast("Movimentação de estoque preparada para lançamento.")} />;
       case "relatorios": return <ReportsPage />;
-      case "integracoes": return <IntegrationsPage />;
+      case "integracoes": return <IntegrationsPage onPersist={async config => {
+        try {
+          if (!window.sessionStorage.getItem("manus-cookie")) return false;
+          await mondayConnectionMutation.mutateAsync(config);
+          return true;
+        } catch {
+          return false;
+        }
+      }} />;
     }
   };
 

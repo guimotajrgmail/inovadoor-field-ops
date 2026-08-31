@@ -14,10 +14,11 @@
 - [x] Migração SQL, helpers de banco, rotas tRPC e validações de autorização.
 - [x] Atualização do service worker para evitar cache antigo no preview.
 - [x] TypeScript, testes Vitest e build de produção validados.
+- [x] Formulários conectados ao tRPC quando há sessão, com fallback demonstrativo offline.
+- [x] Associação de usuários a organização, cliente e terceiro com isolamento de chamados.
+- [x] Upload seguro de fotos e assinatura em storage, GPS e fila offline sincronizável.
+- [x] Configuração de Board ID, direção e webhook do monday.com, persistível via tRPC.
 
-## Próximas melhorias
+## Homologação recomendada
 
-- [ ] Conectar os formulários da interface às mutações tRPC em vez do modo demonstrativo local.
-- [ ] Adicionar autenticação real por organização para clientes e terceiros.
-- [ ] Implementar upload de fotos, assinatura digital, GPS e sincronização offline real.
-- [ ] Mapear boards e webhooks reais do monday.com.
+A solução está pronta para configurar credenciais reais, mapear colunas do board monday.com, registrar o webhook no workspace e homologar os fluxos com usuários da Inovadoor. Essas ações dependem de dados e permissões do ambiente de produção, que não foram inventados nem inseridos nesta validação.

@@ -14,8 +14,10 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  accessProfile: mysqlEnum("accessProfile", ["gestao", "terceiros", "pessoas", "campo"]).default("gestao").notNull(),
+  accessProfile: mysqlEnum("accessProfile", ["gestao", "terceiros", "pessoas", "campo", "cliente"]).default("gestao").notNull(),
   organizationId: int("organizationId"),
+  customerId: int("customerId"),
+  thirdPartyId: int("thirdPartyId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -165,9 +167,24 @@ export const customerTickets = mysqlTable("customerTickets", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const workOrderEvidence = mysqlTable("workOrderEvidence", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  workOrderId: int("workOrderId").notNull(),
+  type: mysqlEnum("type", ["foto", "assinatura", "documento"]).notNull(),
+  fileKey: varchar("fileKey", { length: 255 }).notNull(),
+  fileUrl: varchar("fileUrl", { length: 500 }).notNull(),
+  mimeType: varchar("mimeType", { length: 120 }).notNull(),
+  latitude: varchar("latitude", { length: 32 }),
+  longitude: varchar("longitude", { length: 32 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type WorkOrder = typeof workOrders.$inferSelect;
 export type InsertWorkOrder = typeof workOrders.$inferInsert;
 export type ServiceFormTemplate = typeof serviceFormTemplates.$inferSelect;
 export type CustomerTicket = typeof customerTickets.$inferSelect;
+export type WorkOrderEvidence = typeof workOrderEvidence.$inferSelect;

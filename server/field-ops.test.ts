@@ -34,6 +34,15 @@ const fieldUser: AuthenticatedUser = {
   accessProfile: "campo",
 };
 
+const customerUser: AuthenticatedUser = {
+  ...sampleUser,
+  id: 9,
+  openId: "inovadoor-customer-user",
+  role: "user",
+  accessProfile: "cliente",
+  customerId: 21,
+};
+
 describe("Inovadoor Field Ops", () => {
   it("requires authentication for operational data", async () => {
     const caller = appRouter.createCaller(createContext());
@@ -85,5 +94,31 @@ describe("Inovadoor Field Ops", () => {
       externalId: "CH-TEST-001",
       title: "x",
     })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("prevents a customer user from opening tickets for another customer", async () => {
+    const caller = appRouter.createCaller(createContext(customerUser));
+    await expect(caller.customerTickets.create({
+      customerId: 22,
+      externalId: "CH-ISOLATION-001",
+      title: "Falha no sensor",
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("validates evidence payloads before attempting an upload", async () => {
+    const caller = appRouter.createCaller(createContext(sampleUser));
+    await expect(caller.evidence.add({
+      workOrderExternalId: "OS-2026-0842",
+      type: "foto",
+      fileName: "evidencia.jpg",
+      mimeType: "image/jpeg",
+      dataUrl: "not-a-data-url",
+    })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("requires a customer or third-party scope for scoped users", async () => {
+    const caller = appRouter.createCaller(createContext(sampleUser));
+    await expect(caller.users.assignScope({ userId: 12, accessProfile: "cliente" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(caller.users.assignScope({ userId: 12, accessProfile: "terceiros" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });

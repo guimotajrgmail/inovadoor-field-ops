@@ -22,6 +22,13 @@
       "when": 1788147055882,
       "tag": "0002_dark_rhodey",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1788147697586,
+      "tag": "0003_round_siren",
+      "breakpoints": true
     }
   ]
 }

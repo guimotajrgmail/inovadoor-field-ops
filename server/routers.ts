@@ -12,6 +12,8 @@ import {
   createServiceFormTemplate,
   createThirdParty,
   createWorkOrder,
+  addWorkOrderEvidence,
+  assignUserScope,
   getDashboardSummary,
   getIntegrationConnection,
   linkEquipmentToCustomer,
@@ -21,6 +23,7 @@ import {
   listServiceFormTemplates,
   listTeamMembers,
   listThirdParties,
+  listWorkOrderEvidence,
   listWorkOrders,
   updateWorkOrderStatus,
   upsertMondayConnection,
@@ -47,11 +50,14 @@ export const appRouter = router({
       return { success: true } as const;
     }),
   }),
+  users: router({
+    assignScope: managerProcedure.input(z.object({ userId: z.number().int().positive(), accessProfile: z.enum(["gestao", "terceiros", "pessoas", "campo", "cliente"]), customerId: optionalId, thirdPartyId: optionalId }).refine(input => input.accessProfile !== "cliente" || Boolean(input.customerId), { message: "customerId is required for client users" }).refine(input => input.accessProfile !== "terceiros" || Boolean(input.thirdPartyId), { message: "thirdPartyId is required for third-party users" })).mutation(({ ctx, input }) => assignUserScope({ ...input, organizationId: organizationIdFor(ctx.user) })),
+  }),
   dashboard: router({
     summary: protectedProcedure.query(({ ctx }) => getDashboardSummary(organizationIdFor(ctx.user))),
   }),
   workOrders: router({
-    list: protectedProcedure.query(({ ctx }) => listWorkOrders(organizationIdFor(ctx.user))),
+    list: protectedProcedure.query(({ ctx }) => listWorkOrders(organizationIdFor(ctx.user), ctx.user.accessProfile === "terceiros" ? ctx.user.thirdPartyId : undefined)),
     create: managerProcedure.input(z.object({
       externalId: z.string().min(3).max(80),
       title: z.string().min(3).max(180),
@@ -122,7 +128,10 @@ export const appRouter = router({
     })).mutation(({ ctx, input }) => createServiceFormTemplate({ ...input, fieldsJson: JSON.stringify(input.fields), organizationId: organizationIdFor(ctx.user) })),
   }),
   customerTickets: router({
-    list: protectedProcedure.input(z.object({ customerId: optionalId }).optional()).query(({ ctx, input }) => listCustomerTickets(organizationIdFor(ctx.user), input?.customerId)),
+    list: protectedProcedure.input(z.object({ customerId: optionalId }).optional()).query(({ ctx, input }) => {
+      const scopedCustomerId = ctx.user.accessProfile === "cliente" ? ctx.user.customerId ?? -1 : input?.customerId;
+      return listCustomerTickets(organizationIdFor(ctx.user), scopedCustomerId);
+    }),
     create: protectedProcedure.input(z.object({
       customerId: z.number().int().positive(),
       equipmentId: optionalId,
@@ -130,7 +139,12 @@ export const appRouter = router({
       title: z.string().min(3).max(180),
       description: z.string().max(4000).optional(),
       priority: z.enum(["baixa", "media", "alta"]).default("media"),
-    })).mutation(({ ctx, input }) => createCustomerTicket({ ...input, organizationId: organizationIdFor(ctx.user) })),
+    })).mutation(({ ctx, input }) => {
+      if (ctx.user.accessProfile === "cliente" && ctx.user.customerId !== input.customerId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "O cliente só pode abrir chamados para a própria unidade." });
+      }
+      return createCustomerTicket({ ...input, organizationId: organizationIdFor(ctx.user) });
+    }),
     convertToWorkOrder: managerProcedure.input(z.object({
       ticketId: z.number().int().positive(),
       externalId: z.string().min(3).max(80),
@@ -139,10 +153,25 @@ export const appRouter = router({
       scheduledAt: z.date().optional(),
     })).mutation(({ ctx, input }) => convertCustomerTicketToWorkOrder({ ...input, organizationId: organizationIdFor(ctx.user) })),
   }),
+  evidence: router({
+    list: protectedProcedure.input(z.object({ workOrderId: z.number().int().positive() })).query(({ ctx, input }) => listWorkOrderEvidence(organizationIdFor(ctx.user), input.workOrderId)),
+    add: protectedProcedure.input(z.object({
+      workOrderId: optionalId,
+      workOrderExternalId: z.string().min(3).max(80).optional(),
+      type: z.enum(["foto", "assinatura", "documento"]),
+      fileName: z.string().min(1).max(180),
+      mimeType: z.string().min(3).max(120),
+      dataUrl: z.string().startsWith("data:").max(12_000_000),
+      latitude: z.string().max(32).optional(),
+      longitude: z.string().max(32).optional(),
+      notes: z.string().max(1000).optional(),
+    }).refine(input => Boolean(input.workOrderId || input.workOrderExternalId), { message: "workOrderId or workOrderExternalId is required" })).mutation(({ ctx, input }) => addWorkOrderEvidence({ ...input, organizationId: organizationIdFor(ctx.user) })),
+  }),
   integrations: router({
     monday: router({
       status: protectedProcedure.query(({ ctx }) => getIntegrationConnection(organizationIdFor(ctx.user), "monday")),
       connect: managerProcedure.input(z.object({ workspaceId: z.string().min(2).max(120), settingsJson: z.string().max(4000).optional() })).mutation(({ ctx, input }) => upsertMondayConnection(organizationIdFor(ctx.user), input.workspaceId, input.settingsJson)),
+      webhook: publicProcedure.input(z.object({ boardId: z.string().min(2).max(120), event: z.string().min(2).max(120), payload: z.record(z.string(), z.unknown()).optional() })).mutation(({ input }) => ({ accepted: true, boardId: input.boardId, event: input.event, receivedAt: Date.now() })),
     }),
   }),
   access: router({

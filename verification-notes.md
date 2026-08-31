@@ -8,3 +8,7 @@
 ## Validação dos fluxos na interface
 
 Após limpar o service worker antigo e recarregar o preview com cache-busting, a interface atual passou a exibir o menu **Formulários**, o botão **Abrir chamado**, os indicadores derivados do estado local e o gráfico visível. O bundle servido pelo Vite contém os textos do portal do cliente e dos fluxos de cadastro. A execução direta de `pnpm check`, `pnpm test` e `pnpm build` foi concluída sem falhas; sete testes Vitest passaram.
+
+## Validação final do PWA
+
+Após limpar caches e recarregar o último bundle, o perfil **Equipe de campo** foi acessado pelo seletor de perfis, o atendimento foi iniciado e o DOM confirmou os controles **Evidências do atendimento**, **Adicionar foto**, **Assinatura do cliente**, **GPS** e contador de itens **na fila**. A tela de Formulários também foi aberta pelo menu lateral. A sincronização remota usa tRPC quando existe sessão e mantém a fila local quando o dispositivo está offline ou sem sessão.

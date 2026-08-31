@@ -10,11 +10,13 @@ import {
   thirdParties,
   users,
   workOrderEvents,
+  workOrderEvidence,
   workOrders,
   type InsertWorkOrder,
   type InsertUser,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { storagePut } from "./storage";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -79,6 +81,19 @@ export async function getUserByOpenId(openId: string) {
   return result[0];
 }
 
+export async function assignUserScope(input: { userId: number; organizationId: number; accessProfile: "gestao" | "terceiros" | "pessoas" | "campo" | "cliente"; customerId?: number; thirdPartyId?: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.update(users).set({
+    organizationId: input.organizationId,
+    accessProfile: input.accessProfile,
+    customerId: input.customerId ?? null,
+    thirdPartyId: input.thirdPartyId ?? null,
+  }).where(eq(users.id, input.userId));
+  const result = await db.select().from(users).where(eq(users.id, input.userId)).limit(1);
+  return result[0];
+}
+
 export async function getDashboardSummary(organizationId: number) {
   const db = await getDb();
   if (!db || !organizationId) {
@@ -102,10 +117,10 @@ export async function getDashboardSummary(organizationId: number) {
   };
 }
 
-export async function listWorkOrders(organizationId: number) {
+export async function listWorkOrders(organizationId: number, thirdPartyId?: number | null) {
   const db = await getDb();
   if (!db || !organizationId) return [];
-  return db.select().from(workOrders).where(eq(workOrders.organizationId, organizationId)).orderBy(desc(workOrders.createdAt));
+  return db.select().from(workOrders).where(thirdPartyId ? and(eq(workOrders.organizationId, organizationId), eq(workOrders.assignedThirdPartyId, thirdPartyId)) : eq(workOrders.organizationId, organizationId)).orderBy(desc(workOrders.createdAt));
 }
 
 export async function createWorkOrder(input: InsertWorkOrder) {
@@ -286,6 +301,50 @@ export async function convertCustomerTicketToWorkOrder(input: {
   await db.update(customerTickets).set({ status: "convertido_em_os", updatedAt: new Date() }).where(and(eq(customerTickets.id, ticket.id), eq(customerTickets.organizationId, input.organizationId)));
   const rows = await db.select().from(workOrders).where(eq(workOrders.externalId, input.externalId)).limit(1);
   return rows[0];
+}
+
+export async function listWorkOrderEvidence(organizationId: number, workOrderId: number) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  return db.select().from(workOrderEvidence).where(and(eq(workOrderEvidence.organizationId, organizationId), eq(workOrderEvidence.workOrderId, workOrderId))).orderBy(desc(workOrderEvidence.createdAt));
+}
+
+export async function addWorkOrderEvidence(input: {
+  organizationId: number;
+  workOrderId?: number;
+  workOrderExternalId?: string;
+  type: "foto" | "assinatura" | "documento";
+  fileName: string;
+  mimeType: string;
+  dataUrl: string;
+  latitude?: string;
+  longitude?: string;
+  notes?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const workOrderRows = input.workOrderId
+    ? await db.select().from(workOrders).where(and(eq(workOrders.id, input.workOrderId), eq(workOrders.organizationId, input.organizationId))).limit(1)
+    : await db.select().from(workOrders).where(and(eq(workOrders.externalId, input.workOrderExternalId ?? ""), eq(workOrders.organizationId, input.organizationId))).limit(1);
+  const workOrder = workOrderRows[0];
+  if (!workOrder) throw new Error("Work order not found");
+  const match = input.dataUrl.match(/^data:[^;]+;base64,(.+)$/);
+  if (!match?.[1]) throw new Error("Evidence must be a base64 data URL");
+  const data = Buffer.from(match[1], "base64");
+  if (data.byteLength > 8 * 1024 * 1024) throw new Error("Evidence file is larger than 8 MB");
+  const uploaded = await storagePut(`work-orders/${input.organizationId}/${workOrder.id}/${input.fileName}`, data, input.mimeType);
+  await db.insert(workOrderEvidence).values({
+    organizationId: input.organizationId,
+    workOrderId: workOrder.id,
+    type: input.type,
+    fileKey: uploaded.key,
+    fileUrl: uploaded.url,
+    mimeType: input.mimeType,
+    latitude: input.latitude,
+    longitude: input.longitude,
+    notes: input.notes,
+  });
+  return uploaded;
 }
 
 export async function getIntegrationConnection(organizationId: number, provider: "monday" | "maps" | "email") {
