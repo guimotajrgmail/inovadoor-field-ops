@@ -170,6 +170,10 @@ export default defineConfig({
   },
   server: {
     host: true,
+    // The managed preview proxies HTTP on port 3000 but cannot expose Vite's
+    // internal WebSocket on localhost:5173. Disable the dev-only HMR client
+    // to avoid noisy connection failures; the preview still reloads on refresh.
+    hmr: false,
     allowedHosts: [
       ".manuspre.computer",
       ".manus.computer",
