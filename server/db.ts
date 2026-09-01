@@ -7,6 +7,7 @@ import {
   equipment,
   equipmentCatalogs,
   integrationConnections,
+  mondaySimulatedItems,
   serviceFormTemplates,
   teamMembers,
   thirdParties,
@@ -429,4 +430,44 @@ export async function upsertMondayConnection(organizationId: number, workspaceId
     await db.insert(integrationConnections).values({ organizationId, provider: "monday", status: "conectado", workspaceId, settingsJson });
   }
   return getIntegrationConnection(organizationId, "monday");
+}
+
+export async function listMondaySimulatedItems(organizationId: number, boardId?: string) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  const filters = boardId ? and(eq(mondaySimulatedItems.organizationId, organizationId), eq(mondaySimulatedItems.boardId, boardId)) : eq(mondaySimulatedItems.organizationId, organizationId);
+  return db.select().from(mondaySimulatedItems).where(filters).orderBy(desc(mondaySimulatedItems.lastSyncedAt));
+}
+
+export async function simulateMondayInbound(input: { organizationId: number; boardId: string; mondayItemId: string; itemName: string; status: string; quantity: number; customerName: string; city: string; equipmentStandard: string; serialPrefix: string; installationBase: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const existing = await db.select().from(mondaySimulatedItems).where(and(eq(mondaySimulatedItems.organizationId, input.organizationId), eq(mondaySimulatedItems.mondayItemId, input.mondayItemId))).limit(1);
+  if (existing[0]) return existing[0];
+  const [customer] = await db.select().from(customers).where(eq(customers.organizationId, input.organizationId)).limit(1);
+  const workOrderExternalIds: string[] = [];
+  const quantity = Math.min(Math.max(input.quantity, 1), 100);
+  for (let index = 1; index <= quantity; index += 1) {
+    const externalId = `MON-${input.mondayItemId}-${String(index).padStart(2, "0")}`;
+    workOrderExternalIds.push(externalId);
+    await db.insert(workOrders).values({ organizationId: input.organizationId, customerId: customer?.id, externalId, title: `${input.itemName} · Porta ${index}/${quantity}`, serviceType: "Instalação de porta industrial", priority: "media", status: input.status.toLowerCase() === "expedido" ? "agendada" : "rascunho", address: `${input.installationBase} · ${input.city}`, checklistJson: JSON.stringify({ origem: "monday-simulado", mondayItemId: input.mondayItemId, porta: index, quantidade: quantity, equipamento: input.equipmentStandard, serial: `${input.serialPrefix}-${String(index).padStart(3, "0")}` }) });
+  }
+  const columns = { situacao: input.status, quantidade: quantity, cliente: input.customerName, cidade: input.city, equipamento: input.equipmentStandard, prefixo_serie: input.serialPrefix, local_instalacao: input.installationBase, os_criadas: quantity, os_concluidas: 0, fotos: 0, videos: 0, ultima_sincronizacao: new Date().toISOString() };
+  await db.insert(mondaySimulatedItems).values({ organizationId: input.organizationId, boardId: input.boardId, mondayItemId: input.mondayItemId, name: input.itemName, status: input.status, columnsJson: JSON.stringify(columns), workOrderIdsJson: JSON.stringify(workOrderExternalIds) });
+  const rows = await db.select().from(mondaySimulatedItems).where(and(eq(mondaySimulatedItems.organizationId, input.organizationId), eq(mondaySimulatedItems.mondayItemId, input.mondayItemId))).limit(1);
+  return rows[0];
+}
+
+export async function syncWorkOrderToMonday(input: { organizationId: number; mondayItemId: string; workOrderExternalId: string; status: string; evidenceCount: number; videoCount: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const [item] = await db.select().from(mondaySimulatedItems).where(and(eq(mondaySimulatedItems.organizationId, input.organizationId), eq(mondaySimulatedItems.mondayItemId, input.mondayItemId))).limit(1);
+  if (!item) throw new Error("Simulated monday item not found");
+  const columns = (() => { try { return JSON.parse(item.columnsJson) as Record<string, unknown>; } catch { return {}; } })();
+  const workOrderIds = (() => { try { return JSON.parse(item.workOrderIdsJson) as string[]; } catch { return []; } })();
+  const completed = Number(columns.os_concluidas || 0) + (input.status.toLowerCase() === "concluída" || input.status.toLowerCase() === "concluida" ? 1 : 0);
+  const nextColumns = { ...columns, situacao: completed >= workOrderIds.length ? "Concluído" : "Em execução", os_concluidas: Math.min(completed, workOrderIds.length), ultima_os_atualizada: input.workOrderExternalId, fotos: Number(columns.fotos || 0) + input.evidenceCount, videos: Number(columns.videos || 0) + input.videoCount, ultima_sincronizacao: new Date().toISOString() };
+  await db.update(mondaySimulatedItems).set({ status: String(nextColumns.situacao), columnsJson: JSON.stringify(nextColumns), lastSyncedAt: new Date() }).where(and(eq(mondaySimulatedItems.id, item.id), eq(mondaySimulatedItems.organizationId, input.organizationId)));
+  const [updated] = await db.select().from(mondaySimulatedItems).where(eq(mondaySimulatedItems.id, item.id)).limit(1);
+  return updated;
 }

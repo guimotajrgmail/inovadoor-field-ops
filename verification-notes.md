@@ -32,3 +32,9 @@ Foi criada a tabela `customFormDefinitions`, com API protegida para listar e cri
 ## Próximos passos implementados — 01 set 2026
 
 A tela de Formulários foi validada no preview com as ações Editar, Duplicar e Desativar. O construtor agora aceita condição no sexto segmento do formato de campo (`campo|rótulo|tipo|obrigatório|opções|campo=valor`), e a renderização filtra campos conforme o valor informado. O PWA recebeu bloqueio de conclusão para campos obrigatórios da OS; o formulário padrão “Encerramento técnico” é reintroduzido automaticamente em workspaces locais antigos. `pnpm check`, 12 testes e `pnpm build` foram aprovados.
+
+## monday.com bidirecional simulado — 01 set 2026
+
+A integração recebeu armazenamento persistente de itens simulados e rotas tRPC para listar itens, simular entrada e sincronizar saída. No preview, o fluxo foi executado sem login: um item com situação `Expedido` e quantidade 10 criou o lote “Projeto Expedição FrioSul · 10 portas”, com 10 OS individuais. A etapa de saída concluiu as 10 OS e atualizou o item simulado para `Concluído`, com 20 fotos e 10 vídeos, além dos contadores de OS e data de sincronização.
+
+A documentação pública do monday confirma que a plataforma suporta webhooks de alteração de coluna/status e mutações GraphQL para alteração de valores de colunas; por isso, a mesma estrutura pode ser ligada posteriormente às credenciais reais do workspace. [Referência oficial de webhooks](https://developer.monday.com/api-reference/reference/webhooks) e [referência oficial de alteração de valores](https://developer.monday.com/api-reference/docs/change-item-column-values).

@@ -156,6 +156,18 @@ export const integrationConnections = mysqlTable("integrationConnections", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const mondaySimulatedItems = mysqlTable("mondaySimulatedItems", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  boardId: varchar("boardId", { length: 80 }).notNull(),
+  mondayItemId: varchar("mondayItemId", { length: 80 }).notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  status: varchar("status", { length: 80 }).notNull(),
+  columnsJson: text("columnsJson").notNull(),
+  workOrderIdsJson: text("workOrderIdsJson").notNull(),
+  lastSyncedAt: timestamp("lastSyncedAt").defaultNow().notNull(),
+});
+
 export const serviceFormTemplates = mysqlTable("serviceFormTemplates", {
   id: int("id").autoincrement().primaryKey(),
   organizationId: int("organizationId").notNull(),

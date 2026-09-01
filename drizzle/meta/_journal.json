@@ -43,6 +43,13 @@
       "when": 1788226361865,
       "tag": "0005_tense_justice",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1788228045828,
+      "tag": "0006_early_umar",
+      "breakpoints": true
     }
   ]
 }

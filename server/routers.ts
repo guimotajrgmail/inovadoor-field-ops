@@ -32,6 +32,9 @@ import {
   listThirdParties,
   listWorkOrderEvidence,
   listWorkOrders,
+  listMondaySimulatedItems,
+  simulateMondayInbound,
+  syncWorkOrderToMonday,
   updateWorkOrderStatus,
   upsertMondayConnection,
 } from "./db";
@@ -189,6 +192,9 @@ export const appRouter = router({
     monday: router({
       status: protectedProcedure.query(({ ctx }) => getIntegrationConnection(organizationIdFor(ctx.user), "monday")),
       connect: managerProcedure.input(z.object({ workspaceId: z.string().min(2).max(120), settingsJson: z.string().max(4000).optional() })).mutation(({ ctx, input }) => upsertMondayConnection(organizationIdFor(ctx.user), input.workspaceId, input.settingsJson)),
+      simulatedItems: protectedProcedure.input(z.object({ boardId: z.string().min(2).max(120).optional() }).optional()).query(({ ctx, input }) => listMondaySimulatedItems(organizationIdFor(ctx.user), input?.boardId)),
+      simulateInbound: managerProcedure.input(z.object({ boardId: z.string().min(2).max(120), mondayItemId: z.string().min(1).max(80), itemName: z.string().min(2).max(180), status: z.string().min(2).max(80), quantity: z.number().int().min(1).max(100), customerName: z.string().min(2).max(180), city: z.string().min(2).max(120), equipmentStandard: z.string().min(2).max(180), serialPrefix: z.string().min(2).max(80), installationBase: z.string().min(2).max(180) })).mutation(({ ctx, input }) => simulateMondayInbound({ ...input, organizationId: organizationIdFor(ctx.user) })),
+      simulateOutbound: managerProcedure.input(z.object({ mondayItemId: z.string().min(1).max(80), workOrderExternalId: z.string().min(2).max(80), status: z.string().min(2).max(80), evidenceCount: z.number().int().min(0).max(100).default(0), videoCount: z.number().int().min(0).max(100).default(0) })).mutation(({ ctx, input }) => syncWorkOrderToMonday({ ...input, organizationId: organizationIdFor(ctx.user) })),
       webhook: publicProcedure.input(z.object({ boardId: z.string().min(2).max(120), event: z.string().min(2).max(120), payload: z.record(z.string(), z.unknown()).optional() })).mutation(({ input }) => ({ accepted: true, boardId: input.boardId, event: input.event, receivedAt: Date.now() })),
     }),
   }),
