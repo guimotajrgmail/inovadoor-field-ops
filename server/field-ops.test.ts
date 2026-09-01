@@ -127,4 +127,11 @@ describe("Inovadoor Field Ops", () => {
     await expect(caller.equipment.standards.create({ code: "", name: "Porta rápida" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     await expect(caller.equipment.install({ catalogId: 1, customerId: 1, serialNumber: "", installationLocation: "Doca 05", state: "operacional" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
+
+  it("protects and validates custom form definitions", async () => {
+    const manager = appRouter.createCaller(createContext(sampleUser));
+    const field = appRouter.createCaller(createContext(fieldUser));
+    await expect(field.customForms.create({ entityType: "customer", name: "Sem permissão", fields: [{ key: "x", label: "X", type: "text", required: false }] })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(manager.customForms.create({ entityType: "customer", name: "Sem campos", fields: [] })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
 });

@@ -169,6 +169,18 @@ export const serviceFormTemplates = mysqlTable("serviceFormTemplates", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const customFormDefinitions = mysqlTable("customFormDefinitions", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  entityType: varchar("entityType", { length: 80 }).notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  description: text("description"),
+  fieldsJson: text("fieldsJson").notNull(),
+  active: int("active").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const customerTickets = mysqlTable("customerTickets", {
   id: int("id").autoincrement().primaryKey(),
   organizationId: int("organizationId").notNull(),

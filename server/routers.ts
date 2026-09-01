@@ -10,6 +10,7 @@ import {
   createCustomerTicket,
   createEquipment,
   createEquipmentCatalog,
+  createCustomFormDefinition,
   createServiceFormTemplate,
   createThirdParty,
   createWorkOrder,
@@ -21,6 +22,7 @@ import {
   installEquipmentFromCatalog,
   listCustomers,
   listCustomerTickets,
+  listCustomFormDefinitions,
   listEquipment,
   listEquipmentCatalogs,
   listServiceFormTemplates,
@@ -134,6 +136,10 @@ export const appRouter = router({
       description: z.string().max(4000).optional(),
       fields: z.array(z.string().min(1).max(180)).min(1).max(50),
     })).mutation(({ ctx, input }) => createServiceFormTemplate({ ...input, fieldsJson: JSON.stringify(input.fields), organizationId: organizationIdFor(ctx.user) })),
+  }),
+  customForms: router({
+    list: protectedProcedure.query(({ ctx }) => listCustomFormDefinitions(organizationIdFor(ctx.user))),
+    create: managerProcedure.input(z.object({ entityType: z.enum(["customer", "equipmentStandard", "equipmentInstall", "thirdParty", "person", "workOrder", "ticket"]), name: z.string().min(2).max(180), description: z.string().max(4000).optional(), fields: z.array(z.object({ key: z.string().min(1).max(80), label: z.string().min(1).max(180), type: z.enum(["text", "textarea", "number", "date", "select", "checkbox"]), required: z.boolean().default(false), options: z.array(z.string().max(120)).max(30).optional() })).min(1).max(50) })).mutation(({ ctx, input }) => createCustomFormDefinition({ ...input, fieldsJson: JSON.stringify(input.fields), organizationId: organizationIdFor(ctx.user) })),
   }),
   customerTickets: router({
     list: protectedProcedure.input(z.object({ customerId: optionalId }).optional()).query(({ ctx, input }) => {

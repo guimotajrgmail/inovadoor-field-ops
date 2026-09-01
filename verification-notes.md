@@ -24,3 +24,7 @@ A versão atualizada foi validada no preview: a tela exibe **Equipamentos padrã
 O perfil de Gestão exibiu a navegação operacional com OS, Clientes e Equipamentos. O seletor de perfis apresentou Gestão Inovadoor, Painel de terceiros, Gestão de pessoas, Equipe de campo e Portal do cliente. A tentativa automatizada de trocar para parceiro exigiu passos separados porque a troca de seleção e o login são renderizados em estados consecutivos; a validação será concluída no navegador após esse ajuste de sequência.
 
 A validação por perfil foi concluída: Gestão exibiu OS, Clientes e Equipamentos; Painel de terceiros exibiu Rede de atendimento e SLA da rede; Portal do cliente exibiu Meus chamados, Seus equipamentos e Abrir chamado. As trocas exigem selecionar o perfil e depois confirmar o login em duas etapas.
+
+## Formulários customizáveis — 01 set 2026
+
+Foi criada a tabela `customFormDefinitions`, com API protegida para listar e criar definições por entidade. O módulo Formulários agora mostra o construtor, os tipos disponíveis e definições por Cliente, Equipamento padrão, Instalação, Terceiro, Pessoas, OS e Chamados. No preview, o construtor exibiu entidade, sintaxe de campos e opções; ao abrir Novo cliente, os campos extras “Segmento do cliente” e “Número do contrato” foram renderizados automaticamente.

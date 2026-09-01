@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 import {
   customers,
   customerTickets,
+  customFormDefinitions,
   equipment,
   equipmentCatalogs,
   integrationConnections,
@@ -279,6 +280,20 @@ export async function createServiceFormTemplate(input: {
   if (!db) throw new Error("Database is not available");
   await db.insert(serviceFormTemplates).values(input);
   const rows = await db.select().from(serviceFormTemplates).where(and(eq(serviceFormTemplates.organizationId, input.organizationId), eq(serviceFormTemplates.name, input.name))).orderBy(desc(serviceFormTemplates.id)).limit(1);
+  return rows[0];
+}
+
+export async function listCustomFormDefinitions(organizationId: number) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  return db.select().from(customFormDefinitions).where(and(eq(customFormDefinitions.organizationId, organizationId), eq(customFormDefinitions.active, 1))).orderBy(desc(customFormDefinitions.updatedAt));
+}
+
+export async function createCustomFormDefinition(input: { organizationId: number; entityType: string; name: string; description?: string; fieldsJson: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.insert(customFormDefinitions).values(input);
+  const rows = await db.select().from(customFormDefinitions).where(and(eq(customFormDefinitions.organizationId, input.organizationId), eq(customFormDefinitions.name, input.name))).orderBy(desc(customFormDefinitions.id)).limit(1);
   return rows[0];
 }
 

@@ -9,6 +9,8 @@
 
 O primeiro fluxo operacional do Inovadoor Field Ops foi ampliado para cobrir o ciclo principal solicitado: o cliente abre um chamado no portal, a Gestão Inovadoor recebe a solicitação na fila de triagem e pode convertê-la em ordem de serviço; a equipe administra clientes, unidades, equipamentos, vínculos de ativos, terceiros e formulários padronizados de atendimento e instalação. A solução também mantém a experiência de execução em campo como PWA, com checklist, início e conclusão do atendimento.
 
+Nesta iteração, os cadastros passaram a aceitar **formulários customizáveis por entidade**. A Gestão pode criar uma definição para Clientes, Equipamentos padrão, Instalação, Terceiros, Pessoas, Ordens de serviço ou Chamados e configurar campos de texto, texto longo, número, data, seleção e checkbox, além de obrigatoriedade e opções de seleção. Os campos adicionais são renderizados automaticamente no modal do cadastro correspondente.
+
 A interface atual funciona como uma demonstração operacional persistida no navegador quando não há sessão, permitindo validar o fluxo visual sem depender de dados reais. Quando existe sessão autenticada, formulários, evidências e configurações de integração são enviados pelos contratos tRPC. Essa combinação permite testar a experiência imediatamente sem introduzir registros demonstrativos no banco compartilhado.
 
 ## Fluxos verificados
@@ -31,7 +33,7 @@ A aplicação possui seleção de ambiente por perfil. A **Gestão Inovadoor** a
 
 ## Modelo de dados e API
 
-O banco possui as entidades de organizações, usuários, pessoas, clientes, terceiros, catálogo de equipamentos padrão, unidades instaladas, ordens de serviço, eventos de OS, integrações, templates de formulários e chamados de clientes. A migração `drizzle/0004_right_post.sql` adicionou `equipmentCatalogs`, `equipment.catalogId` e `equipment.installationLocation`, e foi aplicada ao banco do projeto.
+O banco possui as entidades de organizações, usuários, pessoas, clientes, terceiros, catálogo de equipamentos padrão, unidades instaladas, definições de formulários customizáveis, ordens de serviço, eventos de OS, integrações, templates de formulários e chamados de clientes. A migração `drizzle/0005_tense_justice.sql` adicionou `customFormDefinitions` e foi aplicada ao banco do projeto.
 
 | Recurso | Procedimentos disponíveis |
 |---|---|
@@ -39,6 +41,7 @@ O banco possui as entidades de organizações, usuários, pessoas, clientes, ter
 | Equipamentos | `equipment.standards.list`, `equipment.standards.create`, `equipment.install`, `equipment.list`, `equipment.linkCustomer` |
 | Terceiros | `thirdParties.list`, `thirdParties.create` |
 | Formulários | `forms.list`, `forms.create` |
+| Formulários de cadastro | `customForms.list`, `customForms.create` |
 | Chamados | `customerTickets.list`, `customerTickets.create`, `customerTickets.convertToWorkOrder` |
 | Ordens de serviço | `workOrders.list`, `workOrders.create`, `workOrders.updateStatus` |
 | Integração | `integrations.monday.status`, `integrations.monday.connect` |
@@ -60,12 +63,13 @@ A implementação foi validada com TypeScript, testes automatizados e build de p
 | Verificação | Resultado |
 |---|---|
 | `pnpm check` | Aprovado, sem erros TypeScript |
-| `pnpm test` | Aprovado: 11 testes em 2 arquivos |
+| `pnpm test` | Aprovado: 12 testes em 2 arquivos |
 | `pnpm build` | Aprovado, frontend e servidor compilados |
 | Preview do dashboard | Carregado com menu de Formulários e botão Abrir chamado |
 | Console após recarga | Sem saída de erro registrada |
 | Migração SQL | `0004_right_post.sql` aplicada com sucesso ao banco do projeto |
 | Perfis no navegador | Gestão, terceiro e cliente validados no seletor e em seus painéis |
+| Formulários customizados no navegador | Construtor e campos extras de Cliente validados no preview |
 
 Os testes cobrem autenticação obrigatória para dados operacionais, resumo tipado do dashboard, isolamento de ordens por organização, listagem de chamados e formulários, proteção de mutações administrativas por perfil, validação de campos de chamados, escopo de usuários cliente/terceiro, evidências e validação do fluxo em duas etapas de equipamentos.
 
