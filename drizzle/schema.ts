@@ -76,14 +76,30 @@ export const thirdParties = mysqlTable("thirdParties", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const equipmentCatalogs = mysqlTable("equipmentCatalogs", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  code: varchar("code", { length: 80 }).notNull().unique(),
+  name: varchar("name", { length: 180 }).notNull(),
+  category: varchar("category", { length: 120 }).default("Porta industrial").notNull(),
+  manufacturer: varchar("manufacturer", { length: 120 }),
+  model: varchar("model", { length: 120 }),
+  description: text("description"),
+  active: int("active").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const equipment = mysqlTable("equipment", {
   id: int("id").autoincrement().primaryKey(),
   organizationId: int("organizationId").notNull(),
+  catalogId: int("catalogId"),
   customerId: int("customerId"),
   code: varchar("code", { length: 80 }).notNull().unique(),
   name: varchar("name", { length: 180 }).notNull(),
   model: varchar("model", { length: 120 }),
   serialNumber: varchar("serialNumber", { length: 120 }),
+  installationLocation: varchar("installationLocation", { length: 180 }),
   state: mysqlEnum("state", ["operacional", "manutencao", "atencao", "baixado"]).default("operacional").notNull(),
   installedAt: timestamp("installedAt"),
   lastMaintenanceAt: timestamp("lastMaintenanceAt"),

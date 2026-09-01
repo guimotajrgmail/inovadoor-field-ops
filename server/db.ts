@@ -4,6 +4,7 @@ import {
   customers,
   customerTickets,
   equipment,
+  equipmentCatalogs,
   integrationConnections,
   serviceFormTemplates,
   teamMembers,
@@ -170,6 +171,35 @@ export async function listEquipment(organizationId: number) {
   return db.select().from(equipment).where(eq(equipment.organizationId, organizationId)).orderBy(desc(equipment.updatedAt));
 }
 
+export async function listEquipmentCatalogs(organizationId: number) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  return db.select().from(equipmentCatalogs).where(and(eq(equipmentCatalogs.organizationId, organizationId), eq(equipmentCatalogs.active, 1))).orderBy(equipmentCatalogs.name);
+}
+
+export async function createEquipmentCatalog(input: { organizationId: number; code: string; name: string; category?: string; manufacturer?: string; model?: string; description?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.insert(equipmentCatalogs).values(input);
+  const rows = await db.select().from(equipmentCatalogs).where(and(eq(equipmentCatalogs.organizationId, input.organizationId), eq(equipmentCatalogs.code, input.code))).limit(1);
+  return rows[0];
+}
+
+export async function installEquipmentFromCatalog(input: { organizationId: number; catalogId: number; customerId: number; serialNumber: string; installationLocation: string; state?: "operacional" | "manutencao" | "atencao" | "baixado"; notes?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const [catalog] = await db.select().from(equipmentCatalogs).where(and(eq(equipmentCatalogs.id, input.catalogId), eq(equipmentCatalogs.organizationId, input.organizationId))).limit(1);
+  if (!catalog) throw new Error("Equipment standard not found");
+  const [customer] = await db.select().from(customers).where(and(eq(customers.id, input.customerId), eq(customers.organizationId, input.organizationId))).limit(1);
+  if (!customer) throw new Error("Customer not found");
+  const [duplicate] = await db.select({ id: equipment.id }).from(equipment).where(and(eq(equipment.organizationId, input.organizationId), eq(equipment.serialNumber, input.serialNumber))).limit(1);
+  if (duplicate) throw new Error("Serial number already linked to an equipment");
+  const code = `INST-${catalog.code}-${input.serialNumber}`.replace(/[^A-Za-z0-9-]/g, "-").slice(0, 80);
+  await db.insert(equipment).values({ organizationId: input.organizationId, catalogId: catalog.id, customerId: customer.id, code, name: catalog.name, model: catalog.model ?? undefined, serialNumber: input.serialNumber, installationLocation: input.installationLocation, state: input.state ?? "operacional", installedAt: new Date(), qrCode: `EQUIP:${code}`, notes: input.notes });
+  const rows = await db.select().from(equipment).where(and(eq(equipment.organizationId, input.organizationId), eq(equipment.code, code))).limit(1);
+  return rows[0];
+}
+
 export async function createEquipment(input: {
   organizationId: number;
   customerId?: number;
@@ -191,10 +221,14 @@ export async function createEquipment(input: {
   return rows[0];
 }
 
-export async function linkEquipmentToCustomer(organizationId: number, equipmentId: number, customerId: number | null) {
+export async function linkEquipmentToCustomer(organizationId: number, equipmentId: number, customerId: number | null, installationLocation?: string, serialNumber?: string) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
-  await db.update(equipment).set({ customerId, updatedAt: new Date() }).where(and(eq(equipment.id, equipmentId), eq(equipment.organizationId, organizationId)));
+  if (serialNumber) {
+    const [duplicate] = await db.select({ id: equipment.id }).from(equipment).where(and(eq(equipment.organizationId, organizationId), eq(equipment.serialNumber, serialNumber))).limit(1);
+    if (duplicate && duplicate.id !== equipmentId) throw new Error("Serial number already linked to another equipment");
+  }
+  await db.update(equipment).set({ customerId, installationLocation, serialNumber, installedAt: customerId ? new Date() : undefined, updatedAt: new Date() }).where(and(eq(equipment.id, equipmentId), eq(equipment.organizationId, organizationId)));
   const rows = await db.select().from(equipment).where(and(eq(equipment.id, equipmentId), eq(equipment.organizationId, organizationId))).limit(1);
   return rows[0];
 }

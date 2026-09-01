@@ -18,8 +18,8 @@ A interface atual funciona como uma demonstração operacional persistida no nav
 | Cliente abre chamado | Pronto na interface e no contrato de backend | O portal seleciona o equipamento vinculado, registra assunto, descrição e prioridade e cria uma solicitação encaminhada para triagem. |
 | Gestão visualiza e gerencia OS | Pronto | A fila reúne OS próprias e solicitações originadas no portal, com status, prioridade, responsável, terceiro e formulário associado. |
 | Cadastro de cliente | Pronto | A Gestão pode cadastrar razão social, cidade, estado, endereço e contato principal. O cadastro é usado nos demais módulos. |
-| Cadastro de equipamento | Pronto | O ativo recebe nome, código, modelo, estado e cliente vinculado, com espaço para QR Code e histórico de manutenção. |
-| Vínculo equipamento–cliente | Pronto | O vínculo pode ser criado ou atualizado e é usado no portal, nos chamados, nas OS e nos relatórios da unidade. |
+| Cadastro de equipamento padrão | Pronto | A Gestão cadastra modelos reutilizáveis, como **Porta rápida**, com código padrão, categoria, fabricante, modelo e descrição, sem cliente ou número de série. |
+| Instalação e vínculo equipamento–cliente | Pronto | Uma unidade é criada a partir do padrão e recebe cliente/unidade, local físico e número de série único; o vínculo é usado no portal, chamados, OS e formulários. |
 | Gestão de terceiros | Pronto | A Gestão cadastra parceiros, região, responsável, SLA e status de homologação. A OS pode ser atribuída a um terceiro. |
 | Formulário de atendimento | Pronto | Template com diagnóstico, peças, evidências fotográficas, assinatura e checklist. Pode ser vinculado a OS de manutenção. |
 | Formulário de instalação | Pronto | Template com conferência do local, fixação, nivelamento, testes, fotos e termo de aceite. |
@@ -31,12 +31,12 @@ A aplicação possui seleção de ambiente por perfil. A **Gestão Inovadoor** a
 
 ## Modelo de dados e API
 
-O banco possui as entidades de organizações, usuários, pessoas, clientes, terceiros, equipamentos, ordens de serviço, eventos de OS, integrações, templates de formulários e chamados de clientes. Foi adicionada a migração `drizzle/0002_dark_rhodey.sql`, aplicada ao banco do projeto, contendo as tabelas `customerTickets` e `serviceFormTemplates`.
+O banco possui as entidades de organizações, usuários, pessoas, clientes, terceiros, catálogo de equipamentos padrão, unidades instaladas, ordens de serviço, eventos de OS, integrações, templates de formulários e chamados de clientes. A migração `drizzle/0004_right_post.sql` adicionou `equipmentCatalogs`, `equipment.catalogId` e `equipment.installationLocation`, e foi aplicada ao banco do projeto.
 
 | Recurso | Procedimentos disponíveis |
 |---|---|
 | Clientes | `customers.list`, `customers.create` |
-| Equipamentos | `equipment.list`, `equipment.create`, `equipment.linkCustomer` |
+| Equipamentos | `equipment.standards.list`, `equipment.standards.create`, `equipment.install`, `equipment.list`, `equipment.linkCustomer` |
 | Terceiros | `thirdParties.list`, `thirdParties.create` |
 | Formulários | `forms.list`, `forms.create` |
 | Chamados | `customerTickets.list`, `customerTickets.create`, `customerTickets.convertToWorkOrder` |
@@ -60,13 +60,14 @@ A implementação foi validada com TypeScript, testes automatizados e build de p
 | Verificação | Resultado |
 |---|---|
 | `pnpm check` | Aprovado, sem erros TypeScript |
-| `pnpm test` | Aprovado: 10 testes em 2 arquivos |
+| `pnpm test` | Aprovado: 11 testes em 2 arquivos |
 | `pnpm build` | Aprovado, frontend e servidor compilados |
 | Preview do dashboard | Carregado com menu de Formulários e botão Abrir chamado |
 | Console após recarga | Sem saída de erro registrada |
-| Migração SQL | Aplicada com sucesso ao banco do projeto |
+| Migração SQL | `0004_right_post.sql` aplicada com sucesso ao banco do projeto |
+| Perfis no navegador | Gestão, terceiro e cliente validados no seletor e em seus painéis |
 
-Os testes cobrem autenticação obrigatória para dados operacionais, resumo tipado do dashboard, isolamento de ordens por organização, listagem de chamados e formulários, proteção de mutações administrativas por perfil e validação de campos de chamados.
+Os testes cobrem autenticação obrigatória para dados operacionais, resumo tipado do dashboard, isolamento de ordens por organização, listagem de chamados e formulários, proteção de mutações administrativas por perfil, validação de campos de chamados, escopo de usuários cliente/terceiro, evidências e validação do fluxo em duas etapas de equipamentos.
 
 ## Limitações atuais
 

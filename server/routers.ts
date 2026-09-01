@@ -9,6 +9,7 @@ import {
   createCustomer,
   createCustomerTicket,
   createEquipment,
+  createEquipmentCatalog,
   createServiceFormTemplate,
   createThirdParty,
   createWorkOrder,
@@ -17,9 +18,11 @@ import {
   getDashboardSummary,
   getIntegrationConnection,
   linkEquipmentToCustomer,
+  installEquipmentFromCatalog,
   listCustomers,
   listCustomerTickets,
   listEquipment,
+  listEquipmentCatalogs,
   listServiceFormTemplates,
   listTeamMembers,
   listThirdParties,
@@ -88,6 +91,10 @@ export const appRouter = router({
   }),
   equipment: router({
     list: protectedProcedure.query(({ ctx }) => listEquipment(organizationIdFor(ctx.user))),
+    standards: router({
+      list: protectedProcedure.query(({ ctx }) => listEquipmentCatalogs(organizationIdFor(ctx.user))),
+      create: managerProcedure.input(z.object({ code: z.string().min(2).max(80), name: z.string().min(2).max(180), category: z.string().max(120).optional(), manufacturer: z.string().max(120).optional(), model: z.string().max(120).optional(), description: z.string().max(4000).optional() })).mutation(({ ctx, input }) => createEquipmentCatalog({ ...input, organizationId: organizationIdFor(ctx.user) })),
+    }),
     create: managerProcedure.input(z.object({
       code: z.string().min(2).max(80),
       name: z.string().min(2).max(180),
@@ -101,7 +108,8 @@ export const appRouter = router({
       qrCode: z.string().max(160).optional(),
       notes: z.string().max(4000).optional(),
     })).mutation(({ ctx, input }) => createEquipment({ ...input, organizationId: organizationIdFor(ctx.user) })),
-    linkCustomer: managerProcedure.input(z.object({ equipmentId: z.number().int().positive(), customerId: z.number().int().positive().nullable() })).mutation(({ ctx, input }) => linkEquipmentToCustomer(organizationIdFor(ctx.user), input.equipmentId, input.customerId)),
+    install: managerProcedure.input(z.object({ catalogId: z.number().int().positive(), customerId: z.number().int().positive(), serialNumber: z.string().min(2).max(120), installationLocation: z.string().min(2).max(180), state: z.enum(["operacional", "manutencao", "atencao", "baixado"]).default("operacional"), notes: z.string().max(4000).optional() })).mutation(({ ctx, input }) => installEquipmentFromCatalog({ ...input, organizationId: organizationIdFor(ctx.user) })),
+    linkCustomer: managerProcedure.input(z.object({ equipmentId: z.number().int().positive(), customerId: z.number().int().positive().nullable(), installationLocation: z.string().max(180).optional(), serialNumber: z.string().max(120).optional() })).mutation(({ ctx, input }) => linkEquipmentToCustomer(organizationIdFor(ctx.user), input.equipmentId, input.customerId, input.installationLocation, input.serialNumber)),
   }),
   people: router({
     list: protectedProcedure.query(({ ctx }) => listTeamMembers(organizationIdFor(ctx.user))),

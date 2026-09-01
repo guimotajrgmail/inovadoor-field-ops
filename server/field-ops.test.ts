@@ -121,4 +121,10 @@ describe("Inovadoor Field Ops", () => {
     await expect(caller.users.assignScope({ userId: 12, accessProfile: "cliente" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     await expect(caller.users.assignScope({ userId: 12, accessProfile: "terceiros" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
+
+  it("validates the two-step equipment flow inputs", async () => {
+    const caller = appRouter.createCaller(createContext(sampleUser));
+    await expect(caller.equipment.standards.create({ code: "", name: "Porta rápida" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(caller.equipment.install({ catalogId: 1, customerId: 1, serialNumber: "", installationLocation: "Doca 05", state: "operacional" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
 });

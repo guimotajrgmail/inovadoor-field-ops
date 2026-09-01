@@ -5,20 +5,21 @@
 - [x] Portal do cliente com abertura e acompanhamento de chamados.
 - [x] Conversão de chamado de cliente em ordem de serviço de triagem.
 - [x] Cadastro de clientes e unidades.
-- [x] Cadastro de equipamentos com código e QR Code.
-- [x] Vínculo e desvínculo equipamento–cliente.
+- [x] Cadastro de equipamentos padrão, separado das unidades instaladas.
+- [x] Catálogo de padrões com exemplos Porta rápida, Porta seccional e Abrigo de doca.
+- [x] Instalação do padrão em cliente com local físico e número de série.
+- [x] Validação de identificador serial duplicado por organização.
+- [x] Vínculo e ajuste de equipamento–cliente, incluindo local e serial.
 - [x] Gestão de terceiros, homologação e acompanhamento de SLA.
-- [x] Templates de formulários de atendimento e instalação.
-- [x] Associação de formulário à ordem de serviço.
-- [x] PWA de equipe de campo com checklist, início e conclusão de atendimento.
+- [x] Formulários de atendimento e instalação.
+- [x] PWA de equipe de campo com checklist, GPS, fotos, assinatura e offline.
+- [x] PDF baixável do formulário preenchido.
+- [x] Integração monday.com configurável.
+- [x] Perfis de Gestão, Cliente, Terceiro, Pessoas e Equipe de campo.
 - [x] Migração SQL, helpers de banco, rotas tRPC e validações de autorização.
-- [x] Atualização do service worker para evitar cache antigo no preview.
-- [x] TypeScript, testes Vitest e build de produção validados.
-- [x] Formulários conectados ao tRPC quando há sessão, com fallback demonstrativo offline.
-- [x] Associação de usuários a organização, cliente e terceiro com isolamento de chamados.
-- [x] Upload seguro de fotos e assinatura em storage, GPS e fila offline sincronizável.
-- [x] Configuração de Board ID, direção e webhook do monday.com, persistível via tRPC.
+- [x] Testes de contrato para cadastro padrão e instalação.
+- [x] Validação no navegador dos painéis de Gestão, Terceiro e Cliente.
 
 ## Homologação recomendada
 
-A solução está pronta para configurar credenciais reais, mapear colunas do board monday.com, registrar o webhook no workspace e homologar os fluxos com usuários da Inovadoor. Essas ações dependem de dados e permissões do ambiente de produção, que não foram inventados nem inseridos nesta validação.
+Configurar credenciais reais, mapear os campos do board monday.com, cadastrar os padrões oficiais da Inovadoor e validar a política de identificação serial com a equipe de manutenção antes do uso operacional definitivo.
