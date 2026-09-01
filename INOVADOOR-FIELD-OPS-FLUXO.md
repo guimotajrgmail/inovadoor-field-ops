@@ -9,9 +9,11 @@
 
 O primeiro fluxo operacional do Inovadoor Field Ops foi ampliado para cobrir o ciclo principal solicitado: o cliente abre um chamado no portal, a Gestão Inovadoor recebe a solicitação na fila de triagem e pode convertê-la em ordem de serviço; a equipe administra clientes, unidades, equipamentos, vínculos de ativos, terceiros e formulários padronizados de atendimento e instalação. A solução também mantém a experiência de execução em campo como PWA, com checklist, início e conclusão do atendimento.
 
-Nesta iteração, os cadastros passaram a aceitar **formulários customizáveis por entidade**. A Gestão pode criar uma definição para Clientes, Equipamentos padrão, Instalação, Terceiros, Pessoas, Ordens de serviço ou Chamados e configurar campos de texto, texto longo, número, data, seleção e checkbox, além de obrigatoriedade e opções de seleção. Os campos adicionais são renderizados automaticamente no modal do cadastro correspondente.
+Nesta iteração, os cadastros passaram a aceitar **formulários customizáveis por entidade**. A Gestão pode criar uma definição para Clientes, Equipamentos padrão, Instalação, Terceiros, Pessoas, Ordens de serviço ou Chamados e configurar campos de texto, texto longo, número, data, seleção e checkbox, além de obrigatoriedade e opções de seleção. Os campos adicionais são renderizados automaticamente no modal do cadastro correspondente. Também foi adicionada uma camada visual de permissões por perfil: Gestão mantém acesso integral, Pessoas concentra sua operação em pessoas e relatórios, e Terceiros visualiza apenas visão geral, ordens e agenda; tentativas de acessar módulos fora do escopo são bloqueadas com aviso.
 
 A interface atual funciona como uma demonstração operacional persistida no navegador quando não há sessão, permitindo validar o fluxo visual sem depender de dados reais. Quando existe sessão autenticada, formulários, evidências e configurações de integração são enviados pelos contratos tRPC. Essa combinação permite testar a experiência imediatamente sem introduzir registros demonstrativos no banco compartilhado.
+
+O cabeçalho do dashboard agora possui uma **central de notificações** com contagem de não lidas, marcação individual e ação para marcar todas como lidas. O protótipo já exemplifica eventos de OS em campo, chamados recebidos e sincronização concluída; a estrutura está pronta para ser ligada a notificações persistentes e canais externos na etapa de produção.
 
 ## Fluxos verificados
 
@@ -70,12 +72,14 @@ A implementação foi validada com TypeScript, testes automatizados e build de p
 | Migração SQL | `0004_right_post.sql` aplicada com sucesso ao banco do projeto |
 | Perfis no navegador | Gestão, terceiro e cliente validados no seletor e em seus painéis |
 | Formulários customizados no navegador | Construtor e campos extras de Cliente validados no preview |
+| Permissões visuais | Menus e navegação filtrados para Gestão, Pessoas e Terceiros; módulos fora do escopo bloqueados |
+| Central de notificações | Contagem de não lidas, leitura individual e ação “Marcar lidas” validadas no dashboard |
 
 Os testes cobrem autenticação obrigatória para dados operacionais, resumo tipado do dashboard, isolamento de ordens por organização, listagem de chamados e formulários, proteção de mutações administrativas por perfil, validação de campos de chamados, escopo de usuários cliente/terceiro, evidências e validação do fluxo em duas etapas de equipamentos.
 
 ## Limitações atuais
 
-A interface entregue mantém um modo demonstrativo persistido em `localStorage` para funcionar imediatamente no preview sem sessão autenticada. A listagem e criação de formulários, envio de evidências, associação de escopos de usuários e configurações monday.com usam tRPC quando há sessão e conservam fallback local quando não há. Antes do uso operacional definitivo, ainda é recomendável homologar credenciais, permissões e nomes de campos no board real do monday.com, além de definir a política de retenção das evidências.
+A interface entregue mantém um modo demonstrativo persistido em `localStorage` para funcionar imediatamente no preview sem sessão autenticada. A listagem e criação de formulários, envio de evidências, associação de escopos de usuários e configurações monday.com usam tRPC quando há sessão e conservam fallback local quando não há. A central de notificações ainda usa dados demonstrativos locais; antes do uso operacional definitivo, é recomendável persistir preferências e eventos de notificação, homologar credenciais, permissões e nomes de campos no board real do monday.com, além de definir a política de retenção das evidências.
 
 ## Conclusão
 

@@ -16,3 +16,13 @@
 ## Homologação recomendada
 
 Cadastrar os campos oficiais de cada processo Inovadoor, definir responsáveis pela manutenção dos formulários e validar quais campos devem ser obrigatórios antes de permitir o encerramento de uma OS.
+
+## Próxima camada operacional
+
+- [x] Filtrar visualmente a navegação conforme o perfil Gestão, Pessoas ou Terceiros.
+- [x] Bloquear navegação fora do escopo do perfil com mensagem clara ao usuário.
+- [x] Adicionar central de notificações no dashboard, com contador de não lidas.
+- [x] Permitir marcar notificações individualmente ou em lote como lidas.
+- [x] Validar TypeScript, testes automatizados e build após as melhorias.
+- [ ] Persistir eventos e preferências de notificações no banco para produção.
+- [ ] Configurar credenciais e nomes de colunas do board real do monday.com.
