@@ -28,3 +28,7 @@ A validação por perfil foi concluída: Gestão exibiu OS, Clientes e Equipamen
 ## Formulários customizáveis — 01 set 2026
 
 Foi criada a tabela `customFormDefinitions`, com API protegida para listar e criar definições por entidade. O módulo Formulários agora mostra o construtor, os tipos disponíveis e definições por Cliente, Equipamento padrão, Instalação, Terceiro, Pessoas, OS e Chamados. No preview, o construtor exibiu entidade, sintaxe de campos e opções; ao abrir Novo cliente, os campos extras “Segmento do cliente” e “Número do contrato” foram renderizados automaticamente.
+
+## Próximos passos implementados — 01 set 2026
+
+A tela de Formulários foi validada no preview com as ações Editar, Duplicar e Desativar. O construtor agora aceita condição no sexto segmento do formato de campo (`campo|rótulo|tipo|obrigatório|opções|campo=valor`), e a renderização filtra campos conforme o valor informado. O PWA recebeu bloqueio de conclusão para campos obrigatórios da OS; o formulário padrão “Encerramento técnico” é reintroduzido automaticamente em workspaces locais antigos. `pnpm check`, 12 testes e `pnpm build` foram aprovados.

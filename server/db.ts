@@ -297,6 +297,22 @@ export async function createCustomFormDefinition(input: { organizationId: number
   return rows[0];
 }
 
+export async function updateCustomFormDefinition(input: { organizationId: number; id: number; name?: string; description?: string; fieldsJson?: string; active?: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.update(customFormDefinitions).set({ name: input.name, description: input.description, fieldsJson: input.fieldsJson, active: input.active, updatedAt: new Date() }).where(and(eq(customFormDefinitions.id, input.id), eq(customFormDefinitions.organizationId, input.organizationId)));
+  const rows = await db.select().from(customFormDefinitions).where(and(eq(customFormDefinitions.id, input.id), eq(customFormDefinitions.organizationId, input.organizationId))).limit(1);
+  return rows[0];
+}
+
+export async function duplicateCustomFormDefinition(input: { organizationId: number; id: number; name?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const [source] = await db.select().from(customFormDefinitions).where(and(eq(customFormDefinitions.id, input.id), eq(customFormDefinitions.organizationId, input.organizationId))).limit(1);
+  if (!source) throw new Error("Custom form definition not found");
+  return createCustomFormDefinition({ organizationId: input.organizationId, entityType: source.entityType, name: input.name || `${source.name} (cópia)`, description: source.description || undefined, fieldsJson: source.fieldsJson });
+}
+
 export async function listCustomerTickets(organizationId: number, customerId?: number) {
   const db = await getDb();
   if (!db || !organizationId) return [];

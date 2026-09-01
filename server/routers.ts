@@ -18,11 +18,13 @@ import {
   assignUserScope,
   getDashboardSummary,
   getIntegrationConnection,
+  duplicateCustomFormDefinition,
   linkEquipmentToCustomer,
   installEquipmentFromCatalog,
   listCustomers,
   listCustomerTickets,
   listCustomFormDefinitions,
+  updateCustomFormDefinition,
   listEquipment,
   listEquipmentCatalogs,
   listServiceFormTemplates,
@@ -139,7 +141,9 @@ export const appRouter = router({
   }),
   customForms: router({
     list: protectedProcedure.query(({ ctx }) => listCustomFormDefinitions(organizationIdFor(ctx.user))),
-    create: managerProcedure.input(z.object({ entityType: z.enum(["customer", "equipmentStandard", "equipmentInstall", "thirdParty", "person", "workOrder", "ticket"]), name: z.string().min(2).max(180), description: z.string().max(4000).optional(), fields: z.array(z.object({ key: z.string().min(1).max(80), label: z.string().min(1).max(180), type: z.enum(["text", "textarea", "number", "date", "select", "checkbox"]), required: z.boolean().default(false), options: z.array(z.string().max(120)).max(30).optional() })).min(1).max(50) })).mutation(({ ctx, input }) => createCustomFormDefinition({ ...input, fieldsJson: JSON.stringify(input.fields), organizationId: organizationIdFor(ctx.user) })),
+    create: managerProcedure.input(z.object({ entityType: z.enum(["customer", "equipmentStandard", "equipmentInstall", "thirdParty", "person", "workOrder", "ticket"]), name: z.string().min(2).max(180), description: z.string().max(4000).optional(), fields: z.array(z.object({ key: z.string().min(1).max(80), label: z.string().min(1).max(180), type: z.enum(["text", "textarea", "number", "date", "select", "checkbox"]), required: z.boolean().default(false), options: z.array(z.string().max(120)).max(30).optional(), condition: z.object({ fieldKey: z.string().min(1).max(80), equals: z.string().max(180) }).optional() })).min(1).max(50) })).mutation(({ ctx, input }) => createCustomFormDefinition({ ...input, fieldsJson: JSON.stringify(input.fields), organizationId: organizationIdFor(ctx.user) })),
+    update: managerProcedure.input(z.object({ id: z.number().int().positive(), name: z.string().min(2).max(180).optional(), description: z.string().max(4000).optional(), fields: z.array(z.object({ key: z.string().min(1).max(80), label: z.string().min(1).max(180), type: z.enum(["text", "textarea", "number", "date", "select", "checkbox"]), required: z.boolean().default(false), options: z.array(z.string().max(120)).max(30).optional(), condition: z.object({ fieldKey: z.string().min(1).max(80), equals: z.string().max(180) }).optional() })).min(1).max(50).optional(), active: z.number().int().min(0).max(1).optional() })).mutation(({ ctx, input }) => updateCustomFormDefinition({ ...input, fieldsJson: input.fields ? JSON.stringify(input.fields) : undefined, organizationId: organizationIdFor(ctx.user) })),
+    duplicate: managerProcedure.input(z.object({ id: z.number().int().positive(), name: z.string().min(2).max(180).optional() })).mutation(({ ctx, input }) => duplicateCustomFormDefinition({ ...input, organizationId: organizationIdFor(ctx.user) })),
   }),
   customerTickets: router({
     list: protectedProcedure.input(z.object({ customerId: optionalId }).optional()).query(({ ctx, input }) => {
