@@ -33,17 +33,24 @@ import {
   listWorkOrderEvidence,
   listWorkOrders,
   listMondaySimulatedItems,
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
   simulateMondayInbound,
   syncWorkOrderToMonday,
   updateWorkOrderStatus,
   upsertMondayConnection,
 } from "./db";
 
-const organizationIdFor = (user: { organizationId?: number | null }) => user.organizationId ?? 1;
+const organizationIdFor = (user: { organizationId?: number | null }) =>
+  user.organizationId ?? 1;
 
 const managerProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user.role !== "admin" && ctx.user.accessProfile !== "gestao") {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito à gestão da operação." });
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Acesso restrito à gestão da operação.",
+    });
   }
   return next();
 });
@@ -61,145 +68,566 @@ export const appRouter = router({
     }),
   }),
   users: router({
-    assignScope: managerProcedure.input(z.object({ userId: z.number().int().positive(), accessProfile: z.enum(["gestao", "terceiros", "pessoas", "campo", "cliente"]), customerId: optionalId, thirdPartyId: optionalId }).refine(input => input.accessProfile !== "cliente" || Boolean(input.customerId), { message: "customerId is required for client users" }).refine(input => input.accessProfile !== "terceiros" || Boolean(input.thirdPartyId), { message: "thirdPartyId is required for third-party users" })).mutation(({ ctx, input }) => assignUserScope({ ...input, organizationId: organizationIdFor(ctx.user) })),
+    assignScope: managerProcedure
+      .input(
+        z
+          .object({
+            userId: z.number().int().positive(),
+            accessProfile: z.enum([
+              "gestao",
+              "terceiros",
+              "pessoas",
+              "campo",
+              "cliente",
+            ]),
+            customerId: optionalId,
+            thirdPartyId: optionalId,
+          })
+          .refine(
+            input =>
+              input.accessProfile !== "cliente" || Boolean(input.customerId),
+            { message: "customerId is required for client users" }
+          )
+          .refine(
+            input =>
+              input.accessProfile !== "terceiros" ||
+              Boolean(input.thirdPartyId),
+            { message: "thirdPartyId is required for third-party users" }
+          )
+      )
+      .mutation(({ ctx, input }) =>
+        assignUserScope({
+          ...input,
+          organizationId: organizationIdFor(ctx.user),
+        })
+      ),
   }),
   dashboard: router({
-    summary: protectedProcedure.query(({ ctx }) => getDashboardSummary(organizationIdFor(ctx.user))),
+    summary: protectedProcedure.query(({ ctx }) =>
+      getDashboardSummary(organizationIdFor(ctx.user))
+    ),
+  }),
+  notifications: router({
+    list: protectedProcedure.query(({ ctx }) =>
+      listNotifications(organizationIdFor(ctx.user), ctx.user.id)
+    ),
+    markRead: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(({ ctx, input }) =>
+        markNotificationRead({
+          organizationId: organizationIdFor(ctx.user),
+          userId: ctx.user.id,
+          id: input.id,
+        })
+      ),
+    markAllRead: protectedProcedure.mutation(({ ctx }) =>
+      markAllNotificationsRead({
+        organizationId: organizationIdFor(ctx.user),
+        userId: ctx.user.id,
+      })
+    ),
   }),
   workOrders: router({
-    list: protectedProcedure.query(({ ctx }) => listWorkOrders(organizationIdFor(ctx.user), ctx.user.accessProfile === "terceiros" ? ctx.user.thirdPartyId : undefined)),
-    create: managerProcedure.input(z.object({
-      externalId: z.string().min(3).max(80),
-      title: z.string().min(3).max(180),
-      serviceType: z.string().min(2).max(120),
-      priority: z.enum(["baixa", "media", "alta"]).default("media"),
-      customerId: optionalId,
-      equipmentId: optionalId,
-      assignedMemberId: optionalId,
-      assignedThirdPartyId: optionalId,
-      scheduledAt: z.date().optional(),
-      address: z.string().max(500).optional(),
-      notes: z.string().max(4000).optional(),
-    })).mutation(({ ctx, input }) => createWorkOrder({ ...input, organizationId: organizationIdFor(ctx.user) })),
-    updateStatus: protectedProcedure.input(z.object({ id: z.number().int().positive(), status: z.enum(["rascunho", "agendada", "em_campo", "aguardando_peca", "em_aprovacao", "concluida", "cancelada"]) })).mutation(({ ctx, input }) => updateWorkOrderStatus(organizationIdFor(ctx.user), input.id, input.status, ctx.user.id)),
+    list: protectedProcedure.query(({ ctx }) =>
+      listWorkOrders(
+        organizationIdFor(ctx.user),
+        ctx.user.accessProfile === "terceiros"
+          ? ctx.user.thirdPartyId
+          : undefined
+      )
+    ),
+    create: managerProcedure
+      .input(
+        z.object({
+          externalId: z.string().min(3).max(80),
+          title: z.string().min(3).max(180),
+          serviceType: z.string().min(2).max(120),
+          priority: z.enum(["baixa", "media", "alta"]).default("media"),
+          customerId: optionalId,
+          equipmentId: optionalId,
+          assignedMemberId: optionalId,
+          assignedThirdPartyId: optionalId,
+          scheduledAt: z.date().optional(),
+          address: z.string().max(500).optional(),
+          notes: z.string().max(4000).optional(),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        createWorkOrder({
+          ...input,
+          organizationId: organizationIdFor(ctx.user),
+        })
+      ),
+    updateStatus: protectedProcedure
+      .input(
+        z.object({
+          id: z.number().int().positive(),
+          status: z.enum([
+            "rascunho",
+            "agendada",
+            "em_campo",
+            "aguardando_peca",
+            "em_aprovacao",
+            "concluida",
+            "cancelada",
+          ]),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        updateWorkOrderStatus(
+          organizationIdFor(ctx.user),
+          input.id,
+          input.status,
+          ctx.user.id
+        )
+      ),
   }),
   customers: router({
-    list: protectedProcedure.query(({ ctx }) => listCustomers(organizationIdFor(ctx.user))),
-    create: managerProcedure.input(z.object({
-      name: z.string().min(2).max(180),
-      document: z.string().max(30).optional(),
-      city: z.string().max(100).optional(),
-      state: z.string().length(2).optional(),
-      address: z.string().max(1000).optional(),
-      contactName: z.string().max(160).optional(),
-      contactEmail: z.string().email().optional(),
-      contactPhone: z.string().max(40).optional(),
-    })).mutation(({ ctx, input }) => createCustomer({ ...input, organizationId: organizationIdFor(ctx.user) })),
+    list: protectedProcedure.query(({ ctx }) =>
+      listCustomers(organizationIdFor(ctx.user))
+    ),
+    create: managerProcedure
+      .input(
+        z.object({
+          name: z.string().min(2).max(180),
+          document: z.string().max(30).optional(),
+          city: z.string().max(100).optional(),
+          state: z.string().length(2).optional(),
+          address: z.string().max(1000).optional(),
+          contactName: z.string().max(160).optional(),
+          contactEmail: z.string().email().optional(),
+          contactPhone: z.string().max(40).optional(),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        createCustomer({
+          ...input,
+          organizationId: organizationIdFor(ctx.user),
+        })
+      ),
   }),
   equipment: router({
-    list: protectedProcedure.query(({ ctx }) => listEquipment(organizationIdFor(ctx.user))),
+    list: protectedProcedure.query(({ ctx }) =>
+      listEquipment(organizationIdFor(ctx.user))
+    ),
     standards: router({
-      list: protectedProcedure.query(({ ctx }) => listEquipmentCatalogs(organizationIdFor(ctx.user))),
-      create: managerProcedure.input(z.object({ code: z.string().min(2).max(80), name: z.string().min(2).max(180), category: z.string().max(120).optional(), manufacturer: z.string().max(120).optional(), model: z.string().max(120).optional(), description: z.string().max(4000).optional() })).mutation(({ ctx, input }) => createEquipmentCatalog({ ...input, organizationId: organizationIdFor(ctx.user) })),
+      list: protectedProcedure.query(({ ctx }) =>
+        listEquipmentCatalogs(organizationIdFor(ctx.user))
+      ),
+      create: managerProcedure
+        .input(
+          z.object({
+            code: z.string().min(2).max(80),
+            name: z.string().min(2).max(180),
+            category: z.string().max(120).optional(),
+            manufacturer: z.string().max(120).optional(),
+            model: z.string().max(120).optional(),
+            description: z.string().max(4000).optional(),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          createEquipmentCatalog({
+            ...input,
+            organizationId: organizationIdFor(ctx.user),
+          })
+        ),
     }),
-    create: managerProcedure.input(z.object({
-      code: z.string().min(2).max(80),
-      name: z.string().min(2).max(180),
-      model: z.string().max(120).optional(),
-      serialNumber: z.string().max(120).optional(),
-      customerId: optionalId,
-      state: z.enum(["operacional", "manutencao", "atencao", "baixado"]).default("operacional"),
-      installedAt: z.date().optional(),
-      lastMaintenanceAt: z.date().optional(),
-      nextMaintenanceAt: z.date().optional(),
-      qrCode: z.string().max(160).optional(),
-      notes: z.string().max(4000).optional(),
-    })).mutation(({ ctx, input }) => createEquipment({ ...input, organizationId: organizationIdFor(ctx.user) })),
-    install: managerProcedure.input(z.object({ catalogId: z.number().int().positive(), customerId: z.number().int().positive(), serialNumber: z.string().min(2).max(120), installationLocation: z.string().min(2).max(180), state: z.enum(["operacional", "manutencao", "atencao", "baixado"]).default("operacional"), notes: z.string().max(4000).optional() })).mutation(({ ctx, input }) => installEquipmentFromCatalog({ ...input, organizationId: organizationIdFor(ctx.user) })),
-    linkCustomer: managerProcedure.input(z.object({ equipmentId: z.number().int().positive(), customerId: z.number().int().positive().nullable(), installationLocation: z.string().max(180).optional(), serialNumber: z.string().max(120).optional() })).mutation(({ ctx, input }) => linkEquipmentToCustomer(organizationIdFor(ctx.user), input.equipmentId, input.customerId, input.installationLocation, input.serialNumber)),
+    create: managerProcedure
+      .input(
+        z.object({
+          code: z.string().min(2).max(80),
+          name: z.string().min(2).max(180),
+          model: z.string().max(120).optional(),
+          serialNumber: z.string().max(120).optional(),
+          customerId: optionalId,
+          state: z
+            .enum(["operacional", "manutencao", "atencao", "baixado"])
+            .default("operacional"),
+          installedAt: z.date().optional(),
+          lastMaintenanceAt: z.date().optional(),
+          nextMaintenanceAt: z.date().optional(),
+          qrCode: z.string().max(160).optional(),
+          notes: z.string().max(4000).optional(),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        createEquipment({
+          ...input,
+          organizationId: organizationIdFor(ctx.user),
+        })
+      ),
+    install: managerProcedure
+      .input(
+        z.object({
+          catalogId: z.number().int().positive(),
+          customerId: z.number().int().positive(),
+          serialNumber: z.string().min(2).max(120),
+          installationLocation: z.string().min(2).max(180),
+          state: z
+            .enum(["operacional", "manutencao", "atencao", "baixado"])
+            .default("operacional"),
+          notes: z.string().max(4000).optional(),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        installEquipmentFromCatalog({
+          ...input,
+          organizationId: organizationIdFor(ctx.user),
+        })
+      ),
+    linkCustomer: managerProcedure
+      .input(
+        z.object({
+          equipmentId: z.number().int().positive(),
+          customerId: z.number().int().positive().nullable(),
+          installationLocation: z.string().max(180).optional(),
+          serialNumber: z.string().max(120).optional(),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        linkEquipmentToCustomer(
+          organizationIdFor(ctx.user),
+          input.equipmentId,
+          input.customerId,
+          input.installationLocation,
+          input.serialNumber
+        )
+      ),
   }),
   people: router({
-    list: protectedProcedure.query(({ ctx }) => listTeamMembers(organizationIdFor(ctx.user))),
+    list: protectedProcedure.query(({ ctx }) =>
+      listTeamMembers(organizationIdFor(ctx.user))
+    ),
   }),
   thirdParties: router({
-    list: protectedProcedure.query(({ ctx }) => listThirdParties(organizationIdFor(ctx.user))),
-    create: managerProcedure.input(z.object({
-      name: z.string().min(2).max(180),
-      document: z.string().max(30).optional(),
-      region: z.string().max(100).optional(),
-      contactName: z.string().max(160).optional(),
-      contactEmail: z.string().email().optional(),
-      status: z.enum(["homologado", "em_revisao", "bloqueado"]).default("em_revisao"),
-      slaPercent: z.number().int().min(0).max(100).default(90),
-    })).mutation(({ ctx, input }) => createThirdParty({ ...input, organizationId: organizationIdFor(ctx.user) })),
+    list: protectedProcedure.query(({ ctx }) =>
+      listThirdParties(organizationIdFor(ctx.user))
+    ),
+    create: managerProcedure
+      .input(
+        z.object({
+          name: z.string().min(2).max(180),
+          document: z.string().max(30).optional(),
+          region: z.string().max(100).optional(),
+          contactName: z.string().max(160).optional(),
+          contactEmail: z.string().email().optional(),
+          status: z
+            .enum(["homologado", "em_revisao", "bloqueado"])
+            .default("em_revisao"),
+          slaPercent: z.number().int().min(0).max(100).default(90),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        createThirdParty({
+          ...input,
+          organizationId: organizationIdFor(ctx.user),
+        })
+      ),
   }),
   forms: router({
-    list: protectedProcedure.query(({ ctx }) => listServiceFormTemplates(organizationIdFor(ctx.user))),
-    create: managerProcedure.input(z.object({
-      name: z.string().min(2).max(180),
-      category: z.enum(["atendimento", "instalacao"]),
-      description: z.string().max(4000).optional(),
-      fields: z.array(z.string().min(1).max(180)).min(1).max(50),
-    })).mutation(({ ctx, input }) => createServiceFormTemplate({ ...input, fieldsJson: JSON.stringify(input.fields), organizationId: organizationIdFor(ctx.user) })),
+    list: protectedProcedure.query(({ ctx }) =>
+      listServiceFormTemplates(organizationIdFor(ctx.user))
+    ),
+    create: managerProcedure
+      .input(
+        z.object({
+          name: z.string().min(2).max(180),
+          category: z.enum(["atendimento", "instalacao"]),
+          description: z.string().max(4000).optional(),
+          fields: z.array(z.string().min(1).max(180)).min(1).max(50),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        createServiceFormTemplate({
+          ...input,
+          fieldsJson: JSON.stringify(input.fields),
+          organizationId: organizationIdFor(ctx.user),
+        })
+      ),
   }),
   customForms: router({
-    list: protectedProcedure.query(({ ctx }) => listCustomFormDefinitions(organizationIdFor(ctx.user))),
-    create: managerProcedure.input(z.object({ entityType: z.enum(["customer", "equipmentStandard", "equipmentInstall", "thirdParty", "person", "workOrder", "ticket"]), name: z.string().min(2).max(180), description: z.string().max(4000).optional(), fields: z.array(z.object({ key: z.string().min(1).max(80), label: z.string().min(1).max(180), type: z.enum(["text", "textarea", "number", "date", "select", "checkbox"]), required: z.boolean().default(false), options: z.array(z.string().max(120)).max(30).optional(), condition: z.object({ fieldKey: z.string().min(1).max(80), equals: z.string().max(180) }).optional() })).min(1).max(50) })).mutation(({ ctx, input }) => createCustomFormDefinition({ ...input, fieldsJson: JSON.stringify(input.fields), organizationId: organizationIdFor(ctx.user) })),
-    update: managerProcedure.input(z.object({ id: z.number().int().positive(), name: z.string().min(2).max(180).optional(), description: z.string().max(4000).optional(), fields: z.array(z.object({ key: z.string().min(1).max(80), label: z.string().min(1).max(180), type: z.enum(["text", "textarea", "number", "date", "select", "checkbox"]), required: z.boolean().default(false), options: z.array(z.string().max(120)).max(30).optional(), condition: z.object({ fieldKey: z.string().min(1).max(80), equals: z.string().max(180) }).optional() })).min(1).max(50).optional(), active: z.number().int().min(0).max(1).optional() })).mutation(({ ctx, input }) => updateCustomFormDefinition({ ...input, fieldsJson: input.fields ? JSON.stringify(input.fields) : undefined, organizationId: organizationIdFor(ctx.user) })),
-    duplicate: managerProcedure.input(z.object({ id: z.number().int().positive(), name: z.string().min(2).max(180).optional() })).mutation(({ ctx, input }) => duplicateCustomFormDefinition({ ...input, organizationId: organizationIdFor(ctx.user) })),
+    list: protectedProcedure.query(({ ctx }) =>
+      listCustomFormDefinitions(organizationIdFor(ctx.user))
+    ),
+    create: managerProcedure
+      .input(
+        z.object({
+          entityType: z.enum([
+            "customer",
+            "equipmentStandard",
+            "equipmentInstall",
+            "thirdParty",
+            "person",
+            "workOrder",
+            "ticket",
+          ]),
+          name: z.string().min(2).max(180),
+          description: z.string().max(4000).optional(),
+          fields: z
+            .array(
+              z.object({
+                key: z.string().min(1).max(80),
+                label: z.string().min(1).max(180),
+                type: z.enum([
+                  "text",
+                  "textarea",
+                  "number",
+                  "date",
+                  "select",
+                  "checkbox",
+                ]),
+                required: z.boolean().default(false),
+                options: z.array(z.string().max(120)).max(30).optional(),
+                condition: z
+                  .object({
+                    fieldKey: z.string().min(1).max(80),
+                    equals: z.string().max(180),
+                  })
+                  .optional(),
+              })
+            )
+            .min(1)
+            .max(50),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        createCustomFormDefinition({
+          ...input,
+          fieldsJson: JSON.stringify(input.fields),
+          organizationId: organizationIdFor(ctx.user),
+        })
+      ),
+    update: managerProcedure
+      .input(
+        z.object({
+          id: z.number().int().positive(),
+          name: z.string().min(2).max(180).optional(),
+          description: z.string().max(4000).optional(),
+          fields: z
+            .array(
+              z.object({
+                key: z.string().min(1).max(80),
+                label: z.string().min(1).max(180),
+                type: z.enum([
+                  "text",
+                  "textarea",
+                  "number",
+                  "date",
+                  "select",
+                  "checkbox",
+                ]),
+                required: z.boolean().default(false),
+                options: z.array(z.string().max(120)).max(30).optional(),
+                condition: z
+                  .object({
+                    fieldKey: z.string().min(1).max(80),
+                    equals: z.string().max(180),
+                  })
+                  .optional(),
+              })
+            )
+            .min(1)
+            .max(50)
+            .optional(),
+          active: z.number().int().min(0).max(1).optional(),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        updateCustomFormDefinition({
+          ...input,
+          fieldsJson: input.fields ? JSON.stringify(input.fields) : undefined,
+          organizationId: organizationIdFor(ctx.user),
+        })
+      ),
+    duplicate: managerProcedure
+      .input(
+        z.object({
+          id: z.number().int().positive(),
+          name: z.string().min(2).max(180).optional(),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        duplicateCustomFormDefinition({
+          ...input,
+          organizationId: organizationIdFor(ctx.user),
+        })
+      ),
   }),
   customerTickets: router({
-    list: protectedProcedure.input(z.object({ customerId: optionalId }).optional()).query(({ ctx, input }) => {
-      const scopedCustomerId = ctx.user.accessProfile === "cliente" ? ctx.user.customerId ?? -1 : input?.customerId;
-      return listCustomerTickets(organizationIdFor(ctx.user), scopedCustomerId);
-    }),
-    create: protectedProcedure.input(z.object({
-      customerId: z.number().int().positive(),
-      equipmentId: optionalId,
-      externalId: z.string().min(3).max(80),
-      title: z.string().min(3).max(180),
-      description: z.string().max(4000).optional(),
-      priority: z.enum(["baixa", "media", "alta"]).default("media"),
-    })).mutation(({ ctx, input }) => {
-      if (ctx.user.accessProfile === "cliente" && ctx.user.customerId !== input.customerId) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "O cliente só pode abrir chamados para a própria unidade." });
-      }
-      return createCustomerTicket({ ...input, organizationId: organizationIdFor(ctx.user) });
-    }),
-    convertToWorkOrder: managerProcedure.input(z.object({
-      ticketId: z.number().int().positive(),
-      externalId: z.string().min(3).max(80),
-      assignedMemberId: optionalId,
-      assignedThirdPartyId: optionalId,
-      scheduledAt: z.date().optional(),
-    })).mutation(({ ctx, input }) => convertCustomerTicketToWorkOrder({ ...input, organizationId: organizationIdFor(ctx.user) })),
+    list: protectedProcedure
+      .input(z.object({ customerId: optionalId }).optional())
+      .query(({ ctx, input }) => {
+        const scopedCustomerId =
+          ctx.user.accessProfile === "cliente"
+            ? (ctx.user.customerId ?? -1)
+            : input?.customerId;
+        return listCustomerTickets(
+          organizationIdFor(ctx.user),
+          scopedCustomerId
+        );
+      }),
+    create: protectedProcedure
+      .input(
+        z.object({
+          customerId: z.number().int().positive(),
+          equipmentId: optionalId,
+          externalId: z.string().min(3).max(80),
+          title: z.string().min(3).max(180),
+          description: z.string().max(4000).optional(),
+          priority: z.enum(["baixa", "media", "alta"]).default("media"),
+        })
+      )
+      .mutation(({ ctx, input }) => {
+        if (
+          ctx.user.accessProfile === "cliente" &&
+          ctx.user.customerId !== input.customerId
+        ) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "O cliente só pode abrir chamados para a própria unidade.",
+          });
+        }
+        return createCustomerTicket({
+          ...input,
+          organizationId: organizationIdFor(ctx.user),
+        });
+      }),
+    convertToWorkOrder: managerProcedure
+      .input(
+        z.object({
+          ticketId: z.number().int().positive(),
+          externalId: z.string().min(3).max(80),
+          assignedMemberId: optionalId,
+          assignedThirdPartyId: optionalId,
+          scheduledAt: z.date().optional(),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        convertCustomerTicketToWorkOrder({
+          ...input,
+          organizationId: organizationIdFor(ctx.user),
+        })
+      ),
   }),
   evidence: router({
-    list: protectedProcedure.input(z.object({ workOrderId: z.number().int().positive() })).query(({ ctx, input }) => listWorkOrderEvidence(organizationIdFor(ctx.user), input.workOrderId)),
-    add: protectedProcedure.input(z.object({
-      workOrderId: optionalId,
-      workOrderExternalId: z.string().min(3).max(80).optional(),
-      type: z.enum(["foto", "assinatura", "documento"]),
-      fileName: z.string().min(1).max(180),
-      mimeType: z.string().min(3).max(120),
-      dataUrl: z.string().startsWith("data:").max(12_000_000),
-      latitude: z.string().max(32).optional(),
-      longitude: z.string().max(32).optional(),
-      notes: z.string().max(1000).optional(),
-    }).refine(input => Boolean(input.workOrderId || input.workOrderExternalId), { message: "workOrderId or workOrderExternalId is required" })).mutation(({ ctx, input }) => addWorkOrderEvidence({ ...input, organizationId: organizationIdFor(ctx.user) })),
+    list: protectedProcedure
+      .input(z.object({ workOrderId: z.number().int().positive() }))
+      .query(({ ctx, input }) =>
+        listWorkOrderEvidence(organizationIdFor(ctx.user), input.workOrderId)
+      ),
+    add: protectedProcedure
+      .input(
+        z
+          .object({
+            workOrderId: optionalId,
+            workOrderExternalId: z.string().min(3).max(80).optional(),
+            type: z.enum(["foto", "assinatura", "documento"]),
+            fileName: z.string().min(1).max(180),
+            mimeType: z.string().min(3).max(120),
+            dataUrl: z.string().startsWith("data:").max(12_000_000),
+            latitude: z.string().max(32).optional(),
+            longitude: z.string().max(32).optional(),
+            notes: z.string().max(1000).optional(),
+          })
+          .refine(
+            input => Boolean(input.workOrderId || input.workOrderExternalId),
+            { message: "workOrderId or workOrderExternalId is required" }
+          )
+      )
+      .mutation(({ ctx, input }) =>
+        addWorkOrderEvidence({
+          ...input,
+          organizationId: organizationIdFor(ctx.user),
+        })
+      ),
   }),
   integrations: router({
     monday: router({
-      status: protectedProcedure.query(({ ctx }) => getIntegrationConnection(organizationIdFor(ctx.user), "monday")),
-      connect: managerProcedure.input(z.object({ workspaceId: z.string().min(2).max(120), settingsJson: z.string().max(4000).optional() })).mutation(({ ctx, input }) => upsertMondayConnection(organizationIdFor(ctx.user), input.workspaceId, input.settingsJson)),
-      simulatedItems: protectedProcedure.input(z.object({ boardId: z.string().min(2).max(120).optional() }).optional()).query(({ ctx, input }) => listMondaySimulatedItems(organizationIdFor(ctx.user), input?.boardId)),
-      simulateInbound: managerProcedure.input(z.object({ boardId: z.string().min(2).max(120), mondayItemId: z.string().min(1).max(80), itemName: z.string().min(2).max(180), status: z.string().min(2).max(80), quantity: z.number().int().min(1).max(100), customerName: z.string().min(2).max(180), city: z.string().min(2).max(120), equipmentStandard: z.string().min(2).max(180), serialPrefix: z.string().min(2).max(80), installationBase: z.string().min(2).max(180) })).mutation(({ ctx, input }) => simulateMondayInbound({ ...input, organizationId: organizationIdFor(ctx.user) })),
-      simulateOutbound: managerProcedure.input(z.object({ mondayItemId: z.string().min(1).max(80), workOrderExternalId: z.string().min(2).max(80), status: z.string().min(2).max(80), evidenceCount: z.number().int().min(0).max(100).default(0), videoCount: z.number().int().min(0).max(100).default(0) })).mutation(({ ctx, input }) => syncWorkOrderToMonday({ ...input, organizationId: organizationIdFor(ctx.user) })),
-      webhook: publicProcedure.input(z.object({ boardId: z.string().min(2).max(120), event: z.string().min(2).max(120), payload: z.record(z.string(), z.unknown()).optional() })).mutation(({ input }) => ({ accepted: true, boardId: input.boardId, event: input.event, receivedAt: Date.now() })),
+      status: protectedProcedure.query(({ ctx }) =>
+        getIntegrationConnection(organizationIdFor(ctx.user), "monday")
+      ),
+      connect: managerProcedure
+        .input(
+          z.object({
+            workspaceId: z.string().min(2).max(120),
+            settingsJson: z.string().max(4000).optional(),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          upsertMondayConnection(
+            organizationIdFor(ctx.user),
+            input.workspaceId,
+            input.settingsJson
+          )
+        ),
+      simulatedItems: protectedProcedure
+        .input(
+          z
+            .object({ boardId: z.string().min(2).max(120).optional() })
+            .optional()
+        )
+        .query(({ ctx, input }) =>
+          listMondaySimulatedItems(organizationIdFor(ctx.user), input?.boardId)
+        ),
+      simulateInbound: managerProcedure
+        .input(
+          z.object({
+            boardId: z.string().min(2).max(120),
+            mondayItemId: z.string().min(1).max(80),
+            itemName: z.string().min(2).max(180),
+            status: z.string().min(2).max(80),
+            quantity: z.number().int().min(1).max(100),
+            customerName: z.string().min(2).max(180),
+            city: z.string().min(2).max(120),
+            equipmentStandard: z.string().min(2).max(180),
+            serialPrefix: z.string().min(2).max(80),
+            installationBase: z.string().min(2).max(180),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          simulateMondayInbound({
+            ...input,
+            organizationId: organizationIdFor(ctx.user),
+          })
+        ),
+      simulateOutbound: managerProcedure
+        .input(
+          z.object({
+            mondayItemId: z.string().min(1).max(80),
+            workOrderExternalId: z.string().min(2).max(80),
+            status: z.string().min(2).max(80),
+            evidenceCount: z.number().int().min(0).max(100).default(0),
+            videoCount: z.number().int().min(0).max(100).default(0),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          syncWorkOrderToMonday({
+            ...input,
+            organizationId: organizationIdFor(ctx.user),
+          })
+        ),
+      webhook: publicProcedure
+        .input(
+          z.object({
+            boardId: z.string().min(2).max(120),
+            event: z.string().min(2).max(120),
+            payload: z.record(z.string(), z.unknown()).optional(),
+          })
+        )
+        .mutation(({ input }) => ({
+          accepted: true,
+          boardId: input.boardId,
+          event: input.event,
+          receivedAt: Date.now(),
+        })),
     }),
   }),
   access: router({
-    canManage: protectedProcedure.query(({ ctx }) => ({ canManage: ctx.user.role === "admin" || ctx.user.accessProfile === "gestao", profile: ctx.user.accessProfile })),
+    canManage: protectedProcedure.query(({ ctx }) => ({
+      canManage:
+        ctx.user.role === "admin" || ctx.user.accessProfile === "gestao",
+      profile: ctx.user.accessProfile,
+    })),
   }),
 });
 

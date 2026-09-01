@@ -24,5 +24,9 @@ Cadastrar os campos oficiais de cada processo Inovadoor, definir responsáveis p
 - [x] Adicionar central de notificações no dashboard, com contador de não lidas.
 - [x] Permitir marcar notificações individualmente ou em lote como lidas.
 - [x] Validar TypeScript, testes automatizados e build após as melhorias.
-- [ ] Persistir eventos e preferências de notificações no banco para produção.
-- [ ] Configurar credenciais e nomes de colunas do board real do monday.com.
+- [x] Persistir eventos e preferências de leitura de notificações no banco para produção.
+- [x] Preparar configuração do board real do monday.com com IDs técnicos de colunas, webhook HTTPS, direção e armazenamento sem token no navegador.
+
+## Homologação externa pendente
+
+A conta monday.com está habilitada, porém não possui board relevante disponível nesta sessão. Para ativar o intercâmbio real, ainda é necessário escolher o board operacional, preencher seu Board ID e os IDs técnicos das oito colunas na tela de Integrações e validar o webhook com o administrador do workspace. O protótipo permanece seguro porque não grava token de API em `localStorage` nem o solicita no frontend.

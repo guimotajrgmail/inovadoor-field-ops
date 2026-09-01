@@ -215,6 +215,16 @@ type NotificationItem = {
   tone: "orange" | "blue" | "green";
   read: boolean;
 };
+type MondayColumnMap = {
+  status: string;
+  quantity: string;
+  customer: string;
+  equipment: string;
+  workOrder: string;
+  completed: string;
+  photos: string;
+  videos: string;
+};
 
 const navItems: NavItem[] = [
   { key: "visao", label: "Visão geral", icon: LayoutDashboard },
@@ -2446,6 +2456,34 @@ function IntegrationsPage({
       window.localStorage.getItem("inovadoor-monday-webhook") ||
       "https://inovafield-3zs6fpc2.manus.space/api/monday/webhook"
   );
+  const [columnNames, setColumnNames] = useState<MondayColumnMap>(() => {
+    try {
+      return {
+        status: "situacao",
+        quantity: "quantidade",
+        customer: "cliente",
+        equipment: "equipamento",
+        workOrder: "os_criadas",
+        completed: "os_concluidas",
+        photos: "fotos",
+        videos: "videos",
+        ...JSON.parse(
+          window.localStorage.getItem("inovadoor-monday-columns") || "{}"
+        ),
+      };
+    } catch {
+      return {
+        status: "situacao",
+        quantity: "quantidade",
+        customer: "cliente",
+        equipment: "equipamento",
+        workOrder: "os_criadas",
+        completed: "os_concluidas",
+        photos: "fotos",
+        videos: "videos",
+      };
+    }
+  });
   const [saved, setSaved] = useState(false);
   const [simulated, setSimulated] = useState(false);
   const [localItem, setLocalItem] = useState<{
@@ -2479,16 +2517,7 @@ function IntegrationsPage({
       settingsJson: JSON.stringify({
         direction,
         webhookUrl,
-        columns: {
-          status: "situacao",
-          quantity: "quantidade",
-          customer: "cliente",
-          equipment: "equipamento",
-          workOrder: "os_criadas",
-          completed: "os_concluidas",
-          photos: "fotos",
-          videos: "videos",
-        },
+        columns: columnNames,
       }),
     });
     window.localStorage.setItem(
@@ -2498,6 +2527,10 @@ function IntegrationsPage({
     window.localStorage.setItem("inovadoor-monday-board", boardId);
     window.localStorage.setItem("inovadoor-monday-direction", direction);
     window.localStorage.setItem("inovadoor-monday-webhook", webhookUrl);
+    window.localStorage.setItem(
+      "inovadoor-monday-columns",
+      JSON.stringify(columnNames)
+    );
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2500);
   };
@@ -2664,6 +2697,39 @@ function IntegrationsPage({
                 onChange={setWebhookUrl}
                 placeholder="https://.../api/monday/webhook"
               />
+            </div>
+            <div className="sm:col-span-2">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                Mapeamento das colunas do board
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {(
+                  [
+                    ["status", "Situação"],
+                    ["quantity", "Quantidade"],
+                    ["customer", "Cliente"],
+                    ["equipment", "Equipamento"],
+                    ["workOrder", "OS criadas"],
+                    ["completed", "OS concluídas"],
+                    ["photos", "Fotos"],
+                    ["videos", "Vídeos"],
+                  ] as Array<[keyof MondayColumnMap, string]>
+                ).map(([key, label]) => (
+                  <InputField
+                    key={key}
+                    label={label}
+                    value={columnNames[key]}
+                    onChange={value =>
+                      setColumnNames(current => ({ ...current, [key]: value }))
+                    }
+                    placeholder={`ID de ${label.toLowerCase()}`}
+                  />
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] leading-5 text-slate-400">
+                Use o ID técnico da coluna no monday.com, não apenas o título
+                exibido.
+              </p>
             </div>
             <div className="flex items-center gap-2 sm:col-span-2">
               <ShieldCheck className="h-4 w-4 text-emerald-600" />
@@ -4251,6 +4317,12 @@ export default function Home() {
     trpc.equipment.standards.create.useMutation();
   const equipmentInstallMutation = trpc.equipment.install.useMutation();
   const equipmentLinkMutation = trpc.equipment.linkCustomer.useMutation();
+  const notificationsReadMutation = trpc.notifications.markRead.useMutation();
+  const notificationsAllReadMutation =
+    trpc.notifications.markAllRead.useMutation();
+  const authenticated =
+    typeof window !== "undefined" &&
+    Boolean(window.sessionStorage.getItem("manus-cookie"));
   const [activeRole, setActiveRole] = useState<RoleKey>("gestao");
   const [activeSection, setActiveSection] = useState<SectionKey>("visao");
   const [showLogin, setShowLogin] = useState(false);
@@ -4284,6 +4356,10 @@ export default function Home() {
       read: true,
     },
   ]);
+  const remoteNotifications = trpc.notifications.list.useQuery(undefined, {
+    enabled: authenticated,
+    retry: false,
+  });
   const [store, setStore] = useState<DemoStore>(() => {
     if (typeof window === "undefined") return seedStore;
     try {
@@ -4300,6 +4376,18 @@ export default function Home() {
       JSON.stringify(store)
     );
   }, [store]);
+  useEffect(() => {
+    if (!authenticated || !remoteNotifications.data) return;
+    setNotifications(
+      remoteNotifications.data.map(item => ({
+        id: String(item.id),
+        title: item.title,
+        detail: item.detail,
+        tone: item.tone,
+        read: Boolean(item.readAt),
+      }))
+    );
+  }, [authenticated, remoteNotifications.data]);
   useEffect(() => {
     const mandatoryWorkOrderForm = seedStore.customForms.find(
       form => form.entityType === "workOrder"
@@ -5123,11 +5211,14 @@ export default function Home() {
                         </p>
                       </div>
                       <button
-                        onClick={() =>
+                        onClick={() => {
                           setNotifications(current =>
                             current.map(item => ({ ...item, read: true }))
-                          )
-                        }
+                          );
+                          if (authenticated) {
+                            void notificationsAllReadMutation.mutateAsync();
+                          }
+                        }}
                         className="text-[11px] font-semibold text-orange-600 hover:text-orange-700"
                       >
                         Marcar lidas
@@ -5137,15 +5228,20 @@ export default function Home() {
                       {notifications.map(item => (
                         <button
                           key={item.id}
-                          onClick={() =>
+                          onClick={() => {
                             setNotifications(current =>
                               current.map(entry =>
                                 entry.id === item.id
                                   ? { ...entry, read: true }
                                   : entry
                               )
-                            )
-                          }
+                            );
+                            if (authenticated && /^\d+$/.test(item.id)) {
+                              void notificationsReadMutation.mutateAsync({
+                                id: Number(item.id),
+                              });
+                            }
+                          }}
                           className="flex w-full gap-3 border-b border-slate-50 px-4 py-3 text-left transition hover:bg-slate-50"
                         >
                           <span

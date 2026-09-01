@@ -38,3 +38,9 @@ A tela de Formulários foi validada no preview com as ações Editar, Duplicar e
 A integração recebeu armazenamento persistente de itens simulados e rotas tRPC para listar itens, simular entrada e sincronizar saída. No preview, o fluxo foi executado sem login: um item com situação `Expedido` e quantidade 10 criou o lote “Projeto Expedição FrioSul · 10 portas”, com 10 OS individuais. A etapa de saída concluiu as 10 OS e atualizou o item simulado para `Concluído`, com 20 fotos e 10 vídeos, além dos contadores de OS e data de sincronização.
 
 A documentação pública do monday confirma que a plataforma suporta webhooks de alteração de coluna/status e mutações GraphQL para alteração de valores de colunas; por isso, a mesma estrutura pode ser ligada posteriormente às credenciais reais do workspace. [Referência oficial de webhooks](https://developer.monday.com/api-reference/reference/webhooks) e [referência oficial de alteração de valores](https://developer.monday.com/api-reference/docs/change-item-column-values).
+
+## Validação da iteração de permissões e notificações — 01 set 2026
+
+O preview confirmou a central de notificações com contagem inicial 2, painel com três eventos e ação de marcar como lidas. O perfil Painel de terceiros exibiu somente Visão geral, Ordens de serviço e Agenda e despacho. O módulo Integrações exibiu Board ID, direção, webhook HTTPS e os oito campos editáveis de IDs técnicos: Situação, Quantidade, Cliente, Equipamento, OS criadas, OS concluídas, Fotos e Vídeos.
+
+A conta monday.com está habilitada no conector, mas o contexto retornou zero boards relevantes; portanto, nenhuma alteração externa foi realizada.

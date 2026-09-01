@@ -14,7 +14,15 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  accessProfile: mysqlEnum("accessProfile", ["gestao", "terceiros", "pessoas", "campo", "cliente"]).default("gestao").notNull(),
+  accessProfile: mysqlEnum("accessProfile", [
+    "gestao",
+    "terceiros",
+    "pessoas",
+    "campo",
+    "cliente",
+  ])
+    .default("gestao")
+    .notNull(),
   organizationId: int("organizationId"),
   customerId: int("customerId"),
   thirdPartyId: int("thirdPartyId"),
@@ -23,11 +31,26 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  userId: int("userId"),
+  title: varchar("title", { length: 180 }).notNull(),
+  detail: text("detail").notNull(),
+  tone: mysqlEnum("tone", ["orange", "blue", "green"])
+    .default("blue")
+    .notNull(),
+  readAt: timestamp("readAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const organizations = mysqlTable("organizations", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 180 }).notNull(),
   slug: varchar("slug", { length: 120 }).notNull().unique(),
-  segment: varchar("segment", { length: 120 }).default("Portas industriais").notNull(),
+  segment: varchar("segment", { length: 120 })
+    .default("Portas industriais")
+    .notNull(),
   plan: varchar("plan", { length: 60 }).default("enterprise").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -39,9 +62,15 @@ export const teamMembers = mysqlTable("teamMembers", {
   name: varchar("name", { length: 180 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   phone: varchar("phone", { length: 40 }),
-  profile: mysqlEnum("profile", ["gestao", "coordenacao", "campo", "terceiro"]).default("campo").notNull(),
-  area: varchar("area", { length: 120 }).default("Operações de campo").notNull(),
-  status: mysqlEnum("status", ["ativo", "pendente", "inativo"]).default("ativo").notNull(),
+  profile: mysqlEnum("profile", ["gestao", "coordenacao", "campo", "terceiro"])
+    .default("campo")
+    .notNull(),
+  area: varchar("area", { length: 120 })
+    .default("Operações de campo")
+    .notNull(),
+  status: mysqlEnum("status", ["ativo", "pendente", "inativo"])
+    .default("ativo")
+    .notNull(),
   lastAccessAt: timestamp("lastAccessAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -70,7 +99,9 @@ export const thirdParties = mysqlTable("thirdParties", {
   region: varchar("region", { length: 100 }),
   contactName: varchar("contactName", { length: 160 }),
   contactEmail: varchar("contactEmail", { length: 320 }),
-  status: mysqlEnum("status", ["homologado", "em_revisao", "bloqueado"]).default("em_revisao").notNull(),
+  status: mysqlEnum("status", ["homologado", "em_revisao", "bloqueado"])
+    .default("em_revisao")
+    .notNull(),
   slaPercent: int("slaPercent").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -81,7 +112,9 @@ export const equipmentCatalogs = mysqlTable("equipmentCatalogs", {
   organizationId: int("organizationId").notNull(),
   code: varchar("code", { length: 80 }).notNull().unique(),
   name: varchar("name", { length: 180 }).notNull(),
-  category: varchar("category", { length: 120 }).default("Porta industrial").notNull(),
+  category: varchar("category", { length: 120 })
+    .default("Porta industrial")
+    .notNull(),
   manufacturer: varchar("manufacturer", { length: 120 }),
   model: varchar("model", { length: 120 }),
   description: text("description"),
@@ -100,7 +133,9 @@ export const equipment = mysqlTable("equipment", {
   model: varchar("model", { length: 120 }),
   serialNumber: varchar("serialNumber", { length: 120 }),
   installationLocation: varchar("installationLocation", { length: 180 }),
-  state: mysqlEnum("state", ["operacional", "manutencao", "atencao", "baixado"]).default("operacional").notNull(),
+  state: mysqlEnum("state", ["operacional", "manutencao", "atencao", "baixado"])
+    .default("operacional")
+    .notNull(),
   installedAt: timestamp("installedAt"),
   lastMaintenanceAt: timestamp("lastMaintenanceAt"),
   nextMaintenanceAt: timestamp("nextMaintenanceAt"),
@@ -120,8 +155,20 @@ export const workOrders = mysqlTable("workOrders", {
   externalId: varchar("externalId", { length: 80 }).notNull().unique(),
   title: varchar("title", { length: 180 }).notNull(),
   serviceType: varchar("serviceType", { length: 120 }).notNull(),
-  priority: mysqlEnum("priority", ["baixa", "media", "alta"]).default("media").notNull(),
-  status: mysqlEnum("status", ["rascunho", "agendada", "em_campo", "aguardando_peca", "em_aprovacao", "concluida", "cancelada"]).default("rascunho").notNull(),
+  priority: mysqlEnum("priority", ["baixa", "media", "alta"])
+    .default("media")
+    .notNull(),
+  status: mysqlEnum("status", [
+    "rascunho",
+    "agendada",
+    "em_campo",
+    "aguardando_peca",
+    "em_aprovacao",
+    "concluida",
+    "cancelada",
+  ])
+    .default("rascunho")
+    .notNull(),
   scheduledAt: timestamp("scheduledAt"),
   checkInAt: timestamp("checkInAt"),
   checkOutAt: timestamp("checkOutAt"),
@@ -147,7 +194,9 @@ export const integrationConnections = mysqlTable("integrationConnections", {
   id: int("id").autoincrement().primaryKey(),
   organizationId: int("organizationId").notNull(),
   provider: mysqlEnum("provider", ["monday", "maps", "email"]).notNull(),
-  status: mysqlEnum("status", ["pendente", "conectado", "erro"]).default("pendente").notNull(),
+  status: mysqlEnum("status", ["pendente", "conectado", "erro"])
+    .default("pendente")
+    .notNull(),
   workspaceId: varchar("workspaceId", { length: 120 }),
   settingsJson: text("settingsJson"),
   lastSyncAt: timestamp("lastSyncAt"),
@@ -201,8 +250,17 @@ export const customerTickets = mysqlTable("customerTickets", {
   externalId: varchar("externalId", { length: 80 }).notNull().unique(),
   title: varchar("title", { length: 180 }).notNull(),
   description: text("description"),
-  priority: mysqlEnum("priority", ["baixa", "media", "alta"]).default("media").notNull(),
-  status: mysqlEnum("status", ["novo", "em_triagem", "convertido_em_os", "cancelado"]).default("novo").notNull(),
+  priority: mysqlEnum("priority", ["baixa", "media", "alta"])
+    .default("media")
+    .notNull(),
+  status: mysqlEnum("status", [
+    "novo",
+    "em_triagem",
+    "convertido_em_os",
+    "cancelado",
+  ])
+    .default("novo")
+    .notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
