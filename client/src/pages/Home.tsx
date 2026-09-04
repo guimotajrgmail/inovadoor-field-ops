@@ -189,6 +189,12 @@ type EvidencePayload = {
   latitude?: string;
   longitude?: string;
 };
+type PhotoEvidence = {
+  id: string;
+  name: string;
+  dataUrl: string;
+  status: "enviando" | "enviada" | "offline";
+};
 
 type DemoStore = {
   customers: Customer[];
@@ -2903,7 +2909,7 @@ function FieldPwa({
     longitude: number;
   } | null>(null);
   const [locating, setLocating] = useState(false);
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<PhotoEvidence[]>([]);
   const [signatureReady, setSignatureReady] = useState(false);
   const [customValues, setCustomValues] = useState<Record<string, string>>({});
   const requiredFieldsComplete = requiredFields.every(field =>
@@ -2923,11 +2929,33 @@ function FieldPwa({
   );
   const signatureCanvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
+  const lastSignaturePoint = useRef<{ x: number; y: number } | null>(null);
   const onEvidenceRef = useRef(onEvidence);
 
   useEffect(() => {
     onEvidenceRef.current = onEvidence;
   }, [onEvidence]);
+
+  useEffect(() => {
+    const canvas = signatureCanvas.current;
+    if (!canvas) return;
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+      canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+      const context = canvas.getContext("2d");
+      if (context) {
+        context.setTransform(ratio, 0, 0, ratio, 0, 0);
+        context.lineCap = "round";
+        context.lineJoin = "round";
+      }
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const goOnline = () => setIsOffline(false);
@@ -2951,12 +2979,13 @@ function FieldPwa({
     });
   };
 
-  const sendEvidence = async (payload: EvidencePayload) => {
+  const sendEvidence = async (payload: EvidencePayload): Promise<boolean> => {
     if (!isOffline && onEvidence) {
       const sent = await onEvidence(payload);
-      if (sent) return;
+      if (sent) return true;
     }
     queueEvidence(payload);
+    return false;
   };
 
   useEffect(() => {
@@ -2999,14 +3028,22 @@ function FieldPwa({
     );
   };
 
-  const capturePhoto = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result);
-      setPhotos(current => [...current, dataUrl]);
-      void sendEvidence({
+  const capturePhotos = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []).slice(0, 20);
+    if (!files.length) return;
+    for (const file of files) {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const id = `${file.name}-${file.lastModified}-${Math.random()}`;
+      setPhotos(current => [
+        ...current,
+        { id, name: file.name, dataUrl, status: "enviando" },
+      ]);
+      const sent = await sendEvidence({
         type: "foto",
         fileName: file.name,
         mimeType: file.type || "image/jpeg",
@@ -3014,8 +3051,14 @@ function FieldPwa({
         latitude: location ? String(location.latitude) : undefined,
         longitude: location ? String(location.longitude) : undefined,
       });
-    };
-    reader.readAsDataURL(file);
+      setPhotos(current =>
+        current.map(photo =>
+          photo.id === id
+            ? { ...photo, status: sent ? "enviada" : "offline" }
+            : photo
+        )
+      );
+    }
     event.target.value = "";
   };
 
@@ -3033,23 +3076,32 @@ function FieldPwa({
     const point = canvasPoint(event);
     if (!canvas || !point) return;
     drawing.current = true;
+    lastSignaturePoint.current = point;
     canvas.setPointerCapture(event.pointerId);
     const context = canvas.getContext("2d");
     if (context) {
       context.beginPath();
       context.moveTo(point.x, point.y);
       context.strokeStyle = "#0d1d2e";
-      context.lineWidth = 3;
+      context.lineWidth = 2.5;
       context.lineCap = "round";
+      context.lineJoin = "round";
     }
   };
   const drawSignature = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (!drawing.current) return;
     const point = canvasPoint(event);
     const context = signatureCanvas.current?.getContext("2d");
-    if (point && context) {
+    const previous = lastSignaturePoint.current;
+    if (point && context && previous) {
+      const midpoint = {
+        x: (previous.x + point.x) / 2,
+        y: (previous.y + point.y) / 2,
+      };
+      context.quadraticCurveTo(previous.x, previous.y, midpoint.x, midpoint.y);
       context.lineTo(point.x, point.y);
       context.stroke();
+      lastSignaturePoint.current = point;
       setSignatureReady(true);
     }
   };
@@ -3067,11 +3119,13 @@ function FieldPwa({
         });
     }
     drawing.current = false;
+    lastSignaturePoint.current = null;
   };
   const clearSignature = () => {
     const canvas = signatureCanvas.current;
     canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
     setSignatureReady(false);
+    lastSignaturePoint.current = null;
   };
 
   return (
@@ -3233,25 +3287,58 @@ function FieldPwa({
                 </div>
                 <label className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-orange-50 px-3 py-2 text-[10px] font-bold text-orange-700">
                   <Camera className="h-3.5 w-3.5" />
-                  Adicionar foto
+                  Adicionar fotos
                   <input
                     type="file"
                     accept="image/*"
                     capture="environment"
-                    onChange={capturePhoto}
+                    multiple
+                    onChange={capturePhotos}
                     className="hidden"
                   />
                 </label>
               </div>
               {photos.length > 0 && (
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 grid grid-cols-4 gap-2">
                   {photos.map((photo, index) => (
-                    <img
-                      key={index}
-                      src={photo}
-                      alt={`Evidência ${index + 1}`}
-                      className="h-14 w-14 rounded-lg object-cover ring-1 ring-slate-200"
-                    />
+                    <div
+                      key={photo.id}
+                      className="group relative aspect-square overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200"
+                    >
+                      <img
+                        src={photo.dataUrl}
+                        alt={`Evidência ${index + 1}: ${photo.name}`}
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPhotos(current =>
+                            current.filter(item => item.id !== photo.id)
+                          )
+                        }
+                        className="absolute right-1 top-1 rounded-full bg-slate-950/70 px-1.5 py-0.5 text-[10px] font-bold text-white opacity-0 transition group-hover:opacity-100"
+                        aria-label={`Remover ${photo.name}`}
+                      >
+                        ×
+                      </button>
+                      <span
+                        className={cx(
+                          "absolute bottom-1 left-1 rounded-full px-1.5 py-0.5 text-[8px] font-bold text-white",
+                          photo.status === "enviada"
+                            ? "bg-emerald-600"
+                            : photo.status === "offline"
+                              ? "bg-amber-600"
+                              : "bg-slate-700/80"
+                        )}
+                      >
+                        {photo.status === "enviada"
+                          ? "Enviada"
+                          : photo.status === "offline"
+                            ? "Offline"
+                            : "Enviando"}
+                      </span>
+                    </div>
                   ))}
                 </div>
               )}
@@ -3272,14 +3359,14 @@ function FieldPwa({
                     Assinatura do cliente
                   </h3>
                   <p className="mt-1 text-[10px] text-slate-400">
-                    Desenhe no quadro para registrar o aceite.
+                    Desenhe com o dedo ou caneta para registrar o aceite.
                   </p>
                 </div>
                 <button
                   onClick={clearSignature}
                   className="text-[10px] font-bold text-slate-400"
                 >
-                  Limpar
+                  Refazer
                 </button>
               </div>
               <canvas
@@ -3289,8 +3376,8 @@ function FieldPwa({
                 onPointerDown={beginSignature}
                 onPointerMove={drawSignature}
                 onPointerUp={endSignature}
-                onPointerLeave={endSignature}
-                className="mt-3 h-24 w-full touch-none rounded-xl border border-dashed border-slate-200 bg-slate-50"
+                onPointerCancel={endSignature}
+                className="mt-3 h-36 w-full touch-none rounded-xl border border-dashed border-slate-200 bg-[linear-gradient(to_bottom,transparent_95%,#e2e8f0_95%)] bg-[length:100%_28px]"
               />
               {signatureReady && (
                 <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
