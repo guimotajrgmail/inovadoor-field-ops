@@ -256,19 +256,22 @@ export async function getDashboardSummary(organizationId: number) {
 
 export async function listWorkOrders(
   organizationId: number,
-  thirdPartyId?: number | null
+  thirdPartyId?: number,
+  customerId?: number
 ) {
   const db = await getDb();
   if (!db || !organizationId) return [];
+  const scope = thirdPartyId
+    ? eq(workOrders.assignedThirdPartyId, thirdPartyId)
+    : customerId
+      ? eq(workOrders.customerId, customerId)
+      : undefined;
   return db
     .select()
     .from(workOrders)
     .where(
-      thirdPartyId
-        ? and(
-            eq(workOrders.organizationId, organizationId),
-            eq(workOrders.assignedThirdPartyId, thirdPartyId)
-          )
+      scope
+        ? and(eq(workOrders.organizationId, organizationId), scope)
         : eq(workOrders.organizationId, organizationId)
     )
     .orderBy(desc(workOrders.createdAt));
@@ -359,13 +362,23 @@ export async function createCustomer(input: {
   return rows[0];
 }
 
-export async function listEquipment(organizationId: number) {
+export async function listEquipment(
+  organizationId: number,
+  customerId?: number
+) {
   const db = await getDb();
   if (!db || !organizationId) return [];
   return db
     .select()
     .from(equipment)
-    .where(eq(equipment.organizationId, organizationId))
+    .where(
+      customerId
+        ? and(
+            eq(equipment.organizationId, organizationId),
+            eq(equipment.customerId, customerId)
+          )
+        : eq(equipment.organizationId, organizationId)
+    )
     .orderBy(desc(equipment.updatedAt));
 }
 

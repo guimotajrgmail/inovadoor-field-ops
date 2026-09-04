@@ -132,7 +132,10 @@ export const appRouter = router({
       listWorkOrders(
         organizationIdFor(ctx.user),
         ctx.user.accessProfile === "terceiros"
-          ? ctx.user.thirdPartyId
+          ? (ctx.user.thirdPartyId ?? undefined)
+          : undefined,
+        ctx.user.accessProfile === "cliente"
+          ? (ctx.user.customerId ?? undefined)
           : undefined
       )
     ),
@@ -208,7 +211,12 @@ export const appRouter = router({
   }),
   equipment: router({
     list: protectedProcedure.query(({ ctx }) =>
-      listEquipment(organizationIdFor(ctx.user))
+      listEquipment(
+        organizationIdFor(ctx.user),
+        ctx.user.accessProfile === "cliente"
+          ? (ctx.user.customerId ?? undefined)
+          : undefined
+      )
     ),
     standards: router({
       list: protectedProcedure.query(({ ctx }) =>

@@ -139,6 +139,20 @@ describe("Inovadoor Field Ops", () => {
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
+  it("scopes customer work orders and equipment to the assigned customer", async () => {
+    const caller = appRouter.createCaller(createContext(customerUser));
+    const [orders, equipment] = await Promise.all([
+      caller.workOrders.list(),
+      caller.equipment.list(),
+    ]);
+    expect(
+      orders.every(order => order.customerId === customerUser.customerId)
+    ).toBe(true);
+    expect(
+      equipment.every(item => item.customerId === customerUser.customerId)
+    ).toBe(true);
+  });
+
   it("validates evidence payloads before attempting an upload", async () => {
     const caller = appRouter.createCaller(createContext(sampleUser));
     await expect(
