@@ -2894,6 +2894,176 @@ function IntegrationsPage({
   );
 }
 
+function OperationsDashboard({
+  mode,
+  role,
+}: {
+  mode: "installation" | "assistance";
+  role: RoleKey;
+}) {
+  const authenticated =
+    typeof window !== "undefined" &&
+    Boolean(window.sessionStorage.getItem("manus-cookie"));
+  const plansQuery = trpc.integrations.operations.installationPlans.useQuery(
+    undefined,
+    { enabled: authenticated, retry: false }
+  );
+  const requestsQuery = trpc.integrations.operations.technicalRequests.useQuery(
+    undefined,
+    { enabled: authenticated, retry: false }
+  );
+  const acceptMutation =
+    trpc.integrations.operations.acceptInstallation.useMutation();
+  const convertMutation =
+    trpc.integrations.operations.convertTechnicalRequest.useMutation();
+  const [notice, setNotice] = useState("");
+  const demoPlans = [
+    {
+      id: -1,
+      title: "Obra demonstrativa · Centro de Distribuição Araucária",
+      customerName: "FrioSul Distribuição",
+      location: "Araucária · PR",
+      mondayStatus: "Expedido",
+      status: "disponivel",
+    },
+  ];
+  const demoRequests = [
+    {
+      id: -1,
+      title: "Porta rápida com falha no sensor de segurança",
+      customerName: "Metalúrgica Aurora",
+      location: "São José dos Pinhais · PR",
+      priority: "alta",
+      status: "triagem",
+    },
+  ];
+  const plans = plansQuery.data?.length ? plansQuery.data : demoPlans;
+  const requests = requestsQuery.data?.length
+    ? requestsQuery.data
+    : demoRequests;
+  const isInstallation = mode === "installation";
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600">
+            Operação · monday.com
+          </p>
+          <h1 className="mt-1 font-display text-2xl font-bold text-slate-900">
+            {isInstallation
+              ? "Planejamento de instalação"
+              : "Assistência técnica"}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {isInstallation
+              ? "Disponibilize obras, controle aceite e abra a OS somente para o instalador escolhido."
+              : "Faça triagem por prioridade, equipe, SLA e converta o chamado em OS."}
+          </p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">
+          Perfil: {role === "terceiros" ? "Terceiro" : "Gestão"}
+        </span>
+      </div>
+      {notice && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
+          {notice}
+        </div>
+      )}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {(isInstallation ? plans : requests).map(item => {
+          const plan = item as (typeof demoPlans)[number];
+          const request = item as (typeof demoRequests)[number];
+          return (
+            <div
+              key={item.id}
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="rounded-full bg-orange-50 px-2 py-1 text-[10px] font-bold uppercase text-orange-700">
+                    {isInstallation
+                      ? (plan.status ?? "disponível")
+                      : (request.priority ?? "média")}
+                  </span>
+                  <h2 className="mt-3 text-base font-bold text-slate-800">
+                    {item.title}
+                  </h2>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {item.customerName || "Cliente não informado"} ·{" "}
+                    {item.location || "Local não informado"}
+                  </p>
+                </div>
+                <span className="text-[10px] font-semibold text-slate-400">
+                  {isInstallation
+                    ? plan.mondayStatus || "monday"
+                    : request.status}
+                </span>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {isInstallation ? (
+                  <button
+                    className="rounded-xl bg-[#0d1d2e] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                    disabled={acceptMutation.isPending}
+                    onClick={() => {
+                      if (!authenticated || item.id < 0) {
+                        setNotice(
+                          "Modo demonstrativo: o aceite abrirá a OS após o login do instalador."
+                        );
+                        return;
+                      }
+                      void acceptMutation
+                        .mutateAsync({ planId: item.id })
+                        .then(() => {
+                          setNotice(
+                            "Obra aceita e OS criada para este instalador."
+                          );
+                          void plansQuery.refetch();
+                        });
+                    }}
+                  >
+                    {role === "campo"
+                      ? "Aceitar obra"
+                      : "Ver candidatos / aceite"}
+                  </button>
+                ) : (
+                  <button
+                    className="rounded-xl bg-[#0d1d2e] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                    disabled={role !== "gestao" || convertMutation.isPending}
+                    onClick={() => {
+                      if (!authenticated || item.id < 0) {
+                        setNotice(
+                          "Modo demonstrativo: a conversão criará uma OS após o login da gestão."
+                        );
+                        return;
+                      }
+                      void convertMutation
+                        .mutateAsync({ id: item.id })
+                        .then(() => {
+                          setNotice("Chamado convertido em ordem de serviço.");
+                          void requestsQuery.refetch();
+                        });
+                    }}
+                  >
+                    Converter em OS
+                  </button>
+                )}
+                <button
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600"
+                  onClick={() =>
+                    setNotice("Detalhes operacionais preparados para abertura.")
+                  }
+                >
+                  Abrir detalhes
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function FieldPwa({
   onExit,
   onEvidence,
@@ -4507,7 +4677,7 @@ export default function Home() {
     if (activeRole === "pessoas")
       return new Set<SectionKey>(["visao", "pessoas", "relatorios"]);
     if (activeRole === "terceiros")
-      return new Set<SectionKey>(["visao", "ordens", "agenda"]);
+      return new Set<SectionKey>(["visao", "ordens", "agenda", "assistencia"]);
     return new Set<SectionKey>(navItems.map(item => item.key));
   }, [activeRole]);
   const visibleNavItems = navItems.filter(item =>
@@ -5011,6 +5181,10 @@ export default function Home() {
         return (
           <CalendarPage store={store} onAdd={() => openModal("workOrder")} />
         );
+      case "planejamento":
+        return <OperationsDashboard mode="installation" role={activeRole} />;
+      case "assistencia":
+        return <OperationsDashboard mode="assistance" role={activeRole} />;
       case "clientes":
         return (
           <CustomersPage store={store} onAdd={() => openModal("customer")} />
@@ -5139,6 +5313,8 @@ export default function Home() {
                       "visao",
                       "ordens",
                       "agenda",
+                      "planejamento",
+                      "assistencia",
                       "clientes",
                       "equipamentos",
                       "formularios",
