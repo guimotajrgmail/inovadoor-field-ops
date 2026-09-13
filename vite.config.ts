@@ -159,7 +159,10 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+      react: path.resolve(import.meta.dirname, "node_modules/react"),
+      "react-dom": path.resolve(import.meta.dirname, "node_modules/react-dom"),
     },
+    dedupe: ["react", "react-dom"],
   },
   envDir: path.resolve(import.meta.dirname),
   root: path.resolve(import.meta.dirname, "client"),
@@ -168,11 +171,15 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
   },
+  optimizeDeps: {
+    force: true,
+    include: ["react", "react-dom", "@trpc/react-query"],
+  },
   server: {
     host: true,
     // The managed preview proxies HTTP on port 3000 but cannot expose Vite's
-    // internal WebSocket on localhost:5173. Disable the dev-only HMR client
-    // to avoid noisy connection failures; the preview still reloads on refresh.
+    // private WebSocket on localhost:5173. Disable the dev-only HMR client;
+    // preview refreshes remain available through the managed proxy.
     hmr: false,
     allowedHosts: [
       ".manuspre.computer",
