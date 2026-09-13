@@ -6,11 +6,14 @@ import {
   customFormDefinitions,
   equipment,
   equipmentCatalogs,
+  installationPlanVisibility,
+  installationPlans,
   integrationConnections,
   mondaySimulatedItems,
   notifications,
   serviceFormTemplates,
   teamMembers,
+  technicalRequests,
   thirdParties,
   users,
   workOrderEvents,
@@ -1176,4 +1179,447 @@ export async function syncWorkOrderToMonday(input: {
     .where(eq(mondaySimulatedItems.id, item.id))
     .limit(1);
   return updated;
+}
+
+export async function listInstallationPlans(
+  organizationId: number,
+  memberEmail?: string | null
+) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  const plans = await db
+    .select()
+    .from(installationPlans)
+    .where(eq(installationPlans.organizationId, organizationId))
+    .orderBy(desc(installationPlans.updatedAt));
+  if (!memberEmail) return plans;
+  const member = await db
+    .select({ id: teamMembers.id })
+    .from(teamMembers)
+    .where(
+      and(
+        eq(teamMembers.organizationId, organizationId),
+        eq(teamMembers.email, memberEmail)
+      )
+    )
+    .limit(1);
+  if (!member[0]) return [];
+  const visibility = await db
+    .select()
+    .from(installationPlanVisibility)
+    .where(
+      and(
+        eq(installationPlanVisibility.organizationId, organizationId),
+        eq(installationPlanVisibility.teamMemberId, member[0].id)
+      )
+    );
+  const visibleIds = new Set(
+    visibility.filter(row => row.state !== "recusada").map(row => row.planId)
+  );
+  return plans.filter(
+    plan =>
+      plan.acceptedByMemberId === member[0].id ||
+      (plan.status === "disponivel" && visibleIds.has(plan.id))
+  );
+}
+
+export async function upsertInstallationPlan(input: {
+  organizationId: number;
+  boardId: string;
+  mondayItemId: string;
+  title: string;
+  mondayStatus?: string | null;
+  customerName?: string | null;
+  location?: string | null;
+  scheduledAt?: Date | null;
+  metadataJson?: string | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const [existing] = await db
+    .select()
+    .from(installationPlans)
+    .where(
+      and(
+        eq(installationPlans.organizationId, input.organizationId),
+        eq(installationPlans.mondayItemId, input.mondayItemId)
+      )
+    )
+    .limit(1);
+  if (existing) {
+    await db
+      .update(installationPlans)
+      .set({
+        boardId: input.boardId,
+        title: input.title,
+        mondayStatus: input.mondayStatus,
+        customerName: input.customerName,
+        location: input.location,
+        scheduledAt: input.scheduledAt,
+        metadataJson: input.metadataJson,
+        updatedAt: new Date(),
+      })
+      .where(eq(installationPlans.id, existing.id));
+    const [updated] = await db
+      .select()
+      .from(installationPlans)
+      .where(eq(installationPlans.id, existing.id))
+      .limit(1);
+    return updated;
+  }
+  await db.insert(installationPlans).values({
+    organizationId: input.organizationId,
+    boardId: input.boardId,
+    mondayItemId: input.mondayItemId,
+    title: input.title,
+    mondayStatus: input.mondayStatus,
+    customerName: input.customerName,
+    location: input.location,
+    scheduledAt: input.scheduledAt,
+    metadataJson: input.metadataJson,
+  });
+  const [created] = await db
+    .select()
+    .from(installationPlans)
+    .where(
+      and(
+        eq(installationPlans.organizationId, input.organizationId),
+        eq(installationPlans.mondayItemId, input.mondayItemId)
+      )
+    )
+    .limit(1);
+  return created;
+}
+
+export async function assignInstallationPlanVisibility(input: {
+  organizationId: number;
+  planId: number;
+  teamMemberId: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const [existing] = await db
+    .select()
+    .from(installationPlanVisibility)
+    .where(
+      and(
+        eq(installationPlanVisibility.organizationId, input.organizationId),
+        eq(installationPlanVisibility.planId, input.planId),
+        eq(installationPlanVisibility.teamMemberId, input.teamMemberId)
+      )
+    )
+    .limit(1);
+  if (existing) {
+    await db
+      .update(installationPlanVisibility)
+      .set({ state: "visivel", updatedAt: new Date() })
+      .where(eq(installationPlanVisibility.id, existing.id));
+    return existing.id;
+  }
+  await db.insert(installationPlanVisibility).values({
+    organizationId: input.organizationId,
+    planId: input.planId,
+    teamMemberId: input.teamMemberId,
+  });
+  return true;
+}
+
+export async function acceptInstallationPlan(input: {
+  organizationId: number;
+  planId: number;
+  memberEmail: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const [member] = await db
+    .select()
+    .from(teamMembers)
+    .where(
+      and(
+        eq(teamMembers.organizationId, input.organizationId),
+        eq(teamMembers.email, input.memberEmail),
+        eq(teamMembers.status, "ativo")
+      )
+    )
+    .limit(1);
+  if (!member) throw new Error("Técnico não encontrado no time ativo");
+  const [plan] = await db
+    .select()
+    .from(installationPlans)
+    .where(
+      and(
+        eq(installationPlans.id, input.planId),
+        eq(installationPlans.organizationId, input.organizationId)
+      )
+    )
+    .limit(1);
+  if (!plan) throw new Error("Obra de instalação não encontrada");
+  if (plan.status !== "disponivel") {
+    if (plan.acceptedByMemberId === member.id) return plan;
+    throw new Error("Esta obra já foi aceita por outro instalador");
+  }
+  const [candidate] = await db
+    .select()
+    .from(installationPlanVisibility)
+    .where(
+      and(
+        eq(installationPlanVisibility.organizationId, input.organizationId),
+        eq(installationPlanVisibility.planId, plan.id),
+        eq(installationPlanVisibility.teamMemberId, member.id),
+        eq(installationPlanVisibility.state, "visivel")
+      )
+    )
+    .limit(1);
+  if (!candidate)
+    throw new Error("Você não está na lista de instaladores desta obra");
+
+  let workOrderId = plan.workOrderId;
+  if (!workOrderId) {
+    const externalId = `MON-INST-${plan.mondayItemId}`;
+    const [existingOrder] = await db
+      .select({ id: workOrders.id })
+      .from(workOrders)
+      .where(eq(workOrders.externalId, externalId))
+      .limit(1);
+    if (existingOrder) {
+      workOrderId = existingOrder.id;
+    } else {
+      await db.insert(workOrders).values({
+        organizationId: input.organizationId,
+        assignedMemberId: member.id,
+        externalId,
+        title: plan.title,
+        serviceType: "Instalação de porta industrial",
+        priority: "media",
+        status: "agendada",
+        scheduledAt: plan.scheduledAt,
+        address: plan.location,
+        notes: `Obra aceita pelo instalador ${member.name}. Origem monday item ${plan.mondayItemId}.`,
+      });
+      const [createdOrder] = await db
+        .select({ id: workOrders.id })
+        .from(workOrders)
+        .where(eq(workOrders.externalId, externalId))
+        .limit(1);
+      workOrderId = createdOrder?.id;
+    }
+  }
+  await db
+    .update(installationPlans)
+    .set({
+      status: "aceita",
+      acceptedByMemberId: member.id,
+      acceptedAt: new Date(),
+      workOrderId,
+      updatedAt: new Date(),
+    })
+    .where(eq(installationPlans.id, plan.id));
+  await db
+    .update(installationPlanVisibility)
+    .set({ state: "recusada", updatedAt: new Date() })
+    .where(
+      and(
+        eq(installationPlanVisibility.organizationId, input.organizationId),
+        eq(installationPlanVisibility.planId, plan.id)
+      )
+    );
+  await db
+    .update(installationPlanVisibility)
+    .set({ state: "aceita", acceptedAt: new Date(), updatedAt: new Date() })
+    .where(eq(installationPlanVisibility.id, candidate.id));
+  await createNotification({
+    organizationId: input.organizationId,
+    title: "Obra aceita pelo instalador",
+    detail: `${plan.title} foi aceita por ${member.name} e virou a OS ${workOrderId ?? "pendente"}.`,
+    tone: "green",
+  });
+  const [updated] = await db
+    .select()
+    .from(installationPlans)
+    .where(eq(installationPlans.id, plan.id))
+    .limit(1);
+  return updated;
+}
+
+export async function listTechnicalRequests(
+  organizationId: number,
+  thirdPartyId?: number
+) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  const scope = thirdPartyId
+    ? and(
+        eq(technicalRequests.organizationId, organizationId),
+        eq(technicalRequests.assignedThirdPartyId, thirdPartyId)
+      )
+    : eq(technicalRequests.organizationId, organizationId);
+  return db
+    .select()
+    .from(technicalRequests)
+    .where(scope)
+    .orderBy(desc(technicalRequests.updatedAt));
+}
+
+export async function upsertTechnicalRequest(input: {
+  organizationId: number;
+  boardId: string;
+  mondayItemId: string;
+  title: string;
+  customerName?: string | null;
+  location?: string | null;
+  equipment?: string | null;
+  priority?: "baixa" | "media" | "alta" | "critica";
+  notes?: string | null;
+  metadataJson?: string | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const [existing] = await db
+    .select()
+    .from(technicalRequests)
+    .where(
+      and(
+        eq(technicalRequests.organizationId, input.organizationId),
+        eq(technicalRequests.mondayItemId, input.mondayItemId)
+      )
+    )
+    .limit(1);
+  if (existing) {
+    await db
+      .update(technicalRequests)
+      .set({
+        boardId: input.boardId,
+        title: input.title,
+        customerName: input.customerName,
+        location: input.location,
+        equipment: input.equipment,
+        priority: input.priority ?? existing.priority,
+        notes: input.notes,
+        metadataJson: input.metadataJson,
+        updatedAt: new Date(),
+      })
+      .where(eq(technicalRequests.id, existing.id));
+    const [updated] = await db
+      .select()
+      .from(technicalRequests)
+      .where(eq(technicalRequests.id, existing.id))
+      .limit(1);
+    return updated;
+  }
+  await db.insert(technicalRequests).values({
+    organizationId: input.organizationId,
+    boardId: input.boardId,
+    mondayItemId: input.mondayItemId,
+    title: input.title,
+    customerName: input.customerName,
+    location: input.location,
+    equipment: input.equipment,
+    priority: input.priority ?? "media",
+    notes: input.notes,
+    metadataJson: input.metadataJson,
+  });
+  const [created] = await db
+    .select()
+    .from(technicalRequests)
+    .where(
+      and(
+        eq(technicalRequests.organizationId, input.organizationId),
+        eq(technicalRequests.mondayItemId, input.mondayItemId)
+      )
+    )
+    .limit(1);
+  return created;
+}
+
+export async function updateTechnicalRequest(input: {
+  organizationId: number;
+  id: number;
+  status?:
+    | "novo"
+    | "triagem"
+    | "agendado"
+    | "em_execucao"
+    | "concluido"
+    | "cancelado";
+  priority?: "baixa" | "media" | "alta" | "critica";
+  assignedMemberId?: number | null;
+  assignedThirdPartyId?: number | null;
+  notes?: string | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const { id, organizationId, ...changes } = input;
+  await db
+    .update(technicalRequests)
+    .set({ ...changes, updatedAt: new Date() })
+    .where(
+      and(
+        eq(technicalRequests.id, id),
+        eq(technicalRequests.organizationId, organizationId)
+      )
+    );
+  const [updated] = await db
+    .select()
+    .from(technicalRequests)
+    .where(eq(technicalRequests.id, id))
+    .limit(1);
+  return updated;
+}
+
+export async function convertTechnicalRequestToWorkOrder(input: {
+  organizationId: number;
+  id: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const [request] = await db
+    .select()
+    .from(technicalRequests)
+    .where(
+      and(
+        eq(technicalRequests.id, input.id),
+        eq(technicalRequests.organizationId, input.organizationId)
+      )
+    )
+    .limit(1);
+  if (!request) throw new Error("Solicitação técnica não encontrada");
+  if (request.workOrderId) return request;
+  const externalId = `MON-ASSIST-${request.mondayItemId}`;
+  const [existingOrder] = await db
+    .select({ id: workOrders.id })
+    .from(workOrders)
+    .where(eq(workOrders.externalId, externalId))
+    .limit(1);
+  let workOrderId = existingOrder?.id;
+  if (!workOrderId) {
+    await db.insert(workOrders).values({
+      organizationId: input.organizationId,
+      assignedMemberId: request.assignedMemberId,
+      assignedThirdPartyId: request.assignedThirdPartyId,
+      externalId,
+      title: request.title,
+      serviceType: "Assistência técnica",
+      priority: request.priority === "critica" ? "alta" : request.priority,
+      status: "rascunho",
+      address: request.location,
+      notes: request.notes,
+    });
+    const [createdOrder] = await db
+      .select({ id: workOrders.id })
+      .from(workOrders)
+      .where(eq(workOrders.externalId, externalId))
+      .limit(1);
+    workOrderId = createdOrder?.id;
+  }
+  await db
+    .update(technicalRequests)
+    .set({ status: "agendado", workOrderId, updatedAt: new Date() })
+    .where(eq(technicalRequests.id, request.id));
+  await createNotification({
+    organizationId: input.organizationId,
+    title: "Assistência convertida em OS",
+    detail: `${request.title} foi convertida para a OS ${workOrderId ?? "pendente"}.`,
+    tone: "blue",
+  });
+  return { ...request, status: "agendado" as const, workOrderId };
 }

@@ -1,0 +1,641 @@
+{
+  "assistencia": {
+    "file": "/home/ubuntu/upload/assistenciatecnica.xlsx",
+    "sheet": "assistência técnica",
+    "header_row": 3,
+    "row_count": 3116,
+    "column_count": 61,
+    "headers": [
+      "Name",
+      "Subitems",
+      "Qual a NC?",
+      "Ticket",
+      "Info de Abertura",
+      "Status Atendimento",
+      "Creation Log",
+      "Pedido de Origem",
+      "Cliente Origem",
+      "Porta",
+      "Expedição Pedido Origem",
+      "Via",
+      "Resp. Atendimento",
+      "Contato",
+      "Phone",
+      "Email",
+      "Tipo de Atendimento",
+      "Tipo NQ",
+      "Envio de Material",
+      "Envio de Equipe",
+      "Região",
+      "Estado",
+      "Localização",
+      "Fotos/Vídeo",
+      "Ação de Contenção",
+      "Validação da AC",
+      "Retorno Material",
+      "Estoque",
+      "Data Conclusão",
+      "Status Análise",
+      "Grupo da NQ",
+      "Setor Raíz NQ",
+      "Plano de Ação NQ",
+      "Pedido de Garantia",
+      "Data de Emissão",
+      "Cliente",
+      "Valor do Pedido",
+      "Arquivo do Pedido",
+      "Aprovação Gestor",
+      "Aprovação Controladoria",
+      "Revisão",
+      "Status Pedido",
+      "Código Fornecedor NQ",
+      "Nome Fornecedor NQ",
+      "SLA Atendimento",
+      "SLA Expedição",
+      "Data Instalação Planejada",
+      "Link to Dev. Clientes NQ",
+      "Valor Estornado NQ",
+      "Situação do Item NQ",
+      "Em Andamento/Concluído",
+      "Follow",
+      "Data Expedição",
+      "VALOR FRETE",
+      "Valor Total Ticket",
+      "Equipe",
+      "ORÇAMENTO MONTADOR",
+      "Termo de Entrega",
+      "Formula",
+      "Planejamento Instalação",
+      "Valor MO"
+    ],
+    "duplicate_headers": [],
+    "sample_names": [
+      "2654.24 - RIBEIRO CARAM - AUTOZONE, PAULINIA SP",
+      "1314.25 - SPAL CAMPO GRANDE/MS",
+      "1275.24 - Rec. Embu III - Embu das Artes/SP",
+      "2332.24 - BRF - Rio Verde/GO - Lonas",
+      "0079.26 - OGGI - SÃO BERNARDO DO CAMPO - SP",
+      "4863 - AURORA ALIMENTOS -  MANDAGUARI/PR",
+      "1172.25  -  FORT ATACADISTA - BALNEARIO CAMBORIU/SC",
+      "4447 - BRF LUCAS DO RIO VERDE/MT",
+      "1603.25 - GABRIELA GRUISEN BREG - HOLAMBRA-SP",
+      "2636.23 - IMPEXTRACO - MOTOR P9 VAZANDO ÓLEO"
+    ],
+    "status_values": {
+      "Status Atendimento": [
+        [
+          "Concluído",
+          2677
+        ],
+        [
+          "Em Instalação",
+          290
+        ],
+        [
+          "Cancelado",
+          38
+        ],
+        [
+          "Valor",
+          25
+        ],
+        [
+          "Pedido Aberto",
+          19
+        ],
+        [
+          "Em Atendimento",
+          17
+        ],
+        [
+          "Aguardando Informações",
+          9
+        ],
+        [
+          "Aguardando Aprovação",
+          7
+        ],
+        [
+          "Abrir Pedido",
+          2
+        ],
+        [
+          "1172",
+          1
+        ],
+        [
+          "10676",
+          1
+        ],
+        [
+          "2300",
+          1
+        ],
+        [
+          "7000",
+          1
+        ],
+        [
+          "7500",
+          1
+        ],
+        [
+          "4500",
+          1
+        ],
+        [
+          "Em Análise",
+          1
+        ]
+      ],
+      "Status Análise": [
+        [
+          "Concluído",
+          835
+        ],
+        [
+          "Em Andamento",
+          471
+        ],
+        [
+          "Ag Retorno Pç",
+          106
+        ],
+        [
+          "Parado",
+          26
+        ]
+      ],
+      "Status Pedido": [
+        [
+          "Expedido",
+          785
+        ],
+        [
+          "Cancelado",
+          9
+        ],
+        [
+          "Expedição",
+          8
+        ],
+        [
+          "Produção",
+          4
+        ],
+        [
+          "Expedido, Expedido",
+          3
+        ],
+        [
+          "Expedido, Cancelado",
+          1
+        ],
+        [
+          "Expedido, Expedido, Expedido, Serviço Faturado",
+          1
+        ],
+        [
+          "Embalagem",
+          1
+        ],
+        [
+          "Engenharia",
+          1
+        ]
+      ],
+      "Situação do Item NQ": [
+        [
+          "RETORNO AO ALMOX",
+          18
+        ],
+        [
+          "DESCARTE",
+          13
+        ],
+        [
+          "ANÁLISE REALIZADA",
+          5
+        ],
+        [
+          "ANÁLISE REALIZADA, RETORNO AO ALMOX",
+          3
+        ],
+        [
+          "RETORNO AO ALMOX, DESCARTE",
+          2
+        ],
+        [
+          "RETORNO AO ALMOX, RETORNO AO ALMOX, RETORNO AO ALMOX, RETORNO AO ALMOX",
+          1
+        ],
+        [
+          "RETORNO AO ALMOX, RETORNO AO ALMOX, RETORNO AO ALMOX, RETORNO AO ALMOX, RETORNO AO ALMOX",
+          1
+        ],
+        [
+          "RETORNO AO ALMOX, DESCARTE, RETORNO AO ALMOX",
+          1
+        ],
+        [
+          "RETORNO AO ALMOX, RETORNO AO ALMOX",
+          1
+        ]
+      ],
+      "Em Andamento/Concluído": [
+        [
+          "Done",
+          2677
+        ],
+        [
+          "Working on It",
+          383
+        ],
+        [
+          "null",
+          1
+        ]
+      ]
+    },
+    "non_empty_counts": {
+      "Name": 3085,
+      "Subitems": 80,
+      "Qual a NC?": 2107,
+      "Ticket": 3086,
+      "Info de Abertura": 278,
+      "Status Atendimento": 3091,
+      "Creation Log": 3060,
+      "Pedido de Origem": 1651,
+      "Cliente Origem": 1649,
+      "Porta": 1487,
+      "Expedição Pedido Origem": 1593,
+      "Via": 2955,
+      "Resp. Atendimento": 2974,
+      "Contato": 2629,
+      "Phone": 2067,
+      "Email": 709,
+      "Tipo de Atendimento": 3060,
+      "Tipo NQ": 415,
+      "Envio de Material": 376,
+      "Envio de Equipe": 302,
+      "Região": 2970,
+      "Estado": 3060,
+      "Localização": 2896,
+      "Fotos/Vídeo": 1689,
+      "Ação de Contenção": 1618,
+      "Validação da AC": 1555,
+      "Retorno Material": 812,
+      "Estoque": 560,
+      "Data Conclusão": 2722,
+      "Status Análise": 1438,
+      "Grupo da NQ": 1339,
+      "Setor Raíz NQ": 1288,
+      "Plano de Ação NQ": 1115,
+      "Pedido de Garantia": 1209,
+      "Data de Emissão": 1226,
+      "Cliente": 1286,
+      "Valor do Pedido": 1211,
+      "Arquivo do Pedido": 1203,
+      "Aprovação Gestor": 1252,
+      "Aprovação Controladoria": 752,
+      "Revisão": 62,
+      "Status Pedido": 813,
+      "Código Fornecedor NQ": 184,
+      "Nome Fornecedor NQ": 198,
+      "SLA Atendimento": 2722,
+      "SLA Expedição": 789,
+      "Data Instalação Planejada": 4,
+      "Link to Dev. Clientes NQ": 55,
+      "Valor Estornado NQ": 27,
+      "Situação do Item NQ": 45,
+      "Em Andamento/Concluído": 3061,
+      "Follow": 813,
+      "Data Expedição": 788,
+      "VALOR FRETE": 0,
+      "Valor Total Ticket": 1,
+      "Equipe": 133,
+      "ORÇAMENTO MONTADOR": 26,
+      "Termo de Entrega": 41,
+      "Formula": 1201,
+      "Planejamento Instalação": 118,
+      "Valor MO": 6
+    }
+  },
+  "planejamento": {
+    "file": "/home/ubuntu/upload/PlanejamentoInstalacao.xlsx",
+    "sheet": "planejamento instalação",
+    "header_row": 3,
+    "row_count": 3615,
+    "column_count": 54,
+    "headers": [
+      "Name",
+      "Subitems",
+      "Data Pgto NF",
+      "item",
+      "Cliente",
+      "Status Instalação",
+      "Tipo",
+      "Link Comercial",
+      "Ticket Assistência",
+      "Obra Grande",
+      "Contato Obra",
+      "Telefone Obra",
+      "E-mail Obra",
+      "Obra com contrato",
+      "Valor Líq. Equipamentos",
+      "Pedido Compra - Servi;co",
+      "Programador",
+      "Região de Instalação",
+      "Estado",
+      "Localização",
+      "Timeline Instalação - Start",
+      "Timeline Instalação - End",
+      "Equipe",
+      "link to Follow",
+      "Valor Total",
+      "Pedido",
+      "Previsão  Expedição",
+      "Data Expedição",
+      "Qtd Portas",
+      "Modelo",
+      "Tipo Follow",
+      "QDT",
+      "Proj. Adequação",
+      "Status Follow",
+      "Prazo Cliente",
+      "Data Instalação Planejada",
+      "Recebimento Liberado",
+      "1º Contato",
+      "Pedido de Compra",
+      "Início Instalação",
+      "Tempo de Instalação",
+      "Finalizado Instalação",
+      "Termo Entrega/Relatórios",
+      "Fotos/Vídeos",
+      "Status QDT",
+      "Valor Líq Instalação",
+      "link to Aprovação de Pedidos",
+      "Liberado Faturamento",
+      "Data Liberação Faturamento",
+      "Pedido Instalação Datasul",
+      "Valor Pedido Instalação",
+      "NF Instalador",
+      "Data Pgto NF",
+      "link to Assistência Técnica"
+    ],
+    "duplicate_headers": [
+      "Data Pgto NF"
+    ],
+    "sample_names": [
+      "139608",
+      "1712.24",
+      "2711.23 - INSTALAÇÃO - WEST PHARMACEUTICAL, DIADEMA/ SP",
+      "0220.24",
+      "138657",
+      "138786",
+      "2796.23",
+      "2848.23",
+      "138658",
+      "140576"
+    ],
+    "status_values": {
+      "Status Instalação": [
+        [
+          "Concluído",
+          1878
+        ],
+        [
+          "INSTALAÇÃO",
+          379
+        ],
+        [
+          "Servço",
+          363
+        ],
+        [
+          "Instalação não inclusa",
+          249
+        ],
+        [
+          "Obra Nova",
+          205
+        ],
+        [
+          "Definição de equipe",
+          147
+        ],
+        [
+          "Pedido criado",
+          132
+        ],
+        [
+          "Agendado",
+          80
+        ],
+        [
+          "Obra Cancelada",
+          57
+        ],
+        [
+          "LOCAÇÃO DE EQ.",
+          54
+        ],
+        [
+          "Obra Parada",
+          28
+        ],
+        [
+          "Garantia pendente",
+          19
+        ],
+        [
+          "CANCELADO",
+          11
+        ],
+        [
+          "VERIFICAR EXECUÇÃO",
+          8
+        ],
+        [
+          "Status Instalação",
+          2
+        ]
+      ],
+      "Status Follow": [
+        [
+          "Expedido",
+          778
+        ],
+        [
+          "Expedido, Expedido",
+          296
+        ],
+        [
+          "Serviço Faturado",
+          129
+        ],
+        [
+          "Expedido, Expedido, Expedido",
+          114
+        ],
+        [
+          "Serviço Faturado, Expedido",
+          114
+        ],
+        [
+          "Expedido, Serviço Faturado",
+          70
+        ],
+        [
+          "Serviço Faturado, Expedido, Expedido",
+          47
+        ],
+        [
+          "Expedido, Expedido, Expedido, Expedido",
+          47
+        ],
+        [
+          "Serviço a Faturar, Expedido",
+          42
+        ],
+        [
+          "Serviço a Faturar",
+          38
+        ],
+        [
+          "Expedido, Serviço a Faturar",
+          38
+        ],
+        [
+          "Expedido, Expedido, Serviço Faturado",
+          36
+        ],
+        [
+          "Serviço Faturado, Expedido, Expedido, Expedido",
+          30
+        ],
+        [
+          "Expedido, Expedido, Expedido, Expedido, Expedido",
+          26
+        ],
+        [
+          "Cancelado",
+          24
+        ],
+        [
+          "Expedido, Expedido, Serviço a Faturar",
+          23
+        ],
+        [
+          "Projetos, Projetos",
+          18
+        ],
+        [
+          "Expedido, Expedido, Expedido, Expedido, Expedido, Expedido",
+          14
+        ],
+        [
+          "Serviço a Faturar, Expedido, Expedido",
+          13
+        ],
+        [
+          "Expedido, Serviço a Faturar, Expedido",
+          13
+        ]
+      ],
+      "Status QDT": [
+        [
+          "Released for Manufacturing",
+          1321
+        ],
+        [
+          "Canceled",
+          30
+        ],
+        [
+          "In Customer Fulfillment",
+          27
+        ],
+        [
+          "QDT Pending",
+          7
+        ],
+        [
+          "Designers' Analysis",
+          3
+        ],
+        [
+          "Received From the Customer",
+          2
+        ],
+        [
+          "Status QDT",
+          2
+        ],
+        [
+          "Released for Manufacturing, Released for Manufacturing",
+          1
+        ],
+        [
+          "Released for Manufacturing, Released for Manufacturing, Released for Manufacturing",
+          1
+        ]
+      ]
+    },
+    "non_empty_counts": {
+      "Name": 3170,
+      "Subitems": 1172,
+      "Data Pgto NF": 450,
+      "item": 3179,
+      "Cliente": 3021,
+      "Status Instalação": 3612,
+      "Tipo": 2805,
+      "Link Comercial": 2683,
+      "Ticket Assistência": 212,
+      "Obra Grande": 1603,
+      "Contato Obra": 2597,
+      "Telefone Obra": 2525,
+      "E-mail Obra": 2477,
+      "Obra com contrato": 1809,
+      "Valor Líq. Equipamentos": 190,
+      "Pedido Compra - Servi;co": 371,
+      "Programador": 2450,
+      "Região de Instalação": 2628,
+      "Estado": 2805,
+      "Localização": 2075,
+      "Timeline Instalação - Start": 1053,
+      "Timeline Instalação - End": 1053,
+      "Equipe": 1955,
+      "link to Follow": 2286,
+      "Valor Total": 1532,
+      "Pedido": 1687,
+      "Previsão  Expedição": 1725,
+      "Data Expedição": 1951,
+      "Qtd Portas": 1837,
+      "Modelo": 1837,
+      "Tipo Follow": 2286,
+      "QDT": 1714,
+      "Proj. Adequação": 465,
+      "Status Follow": 2286,
+      "Prazo Cliente": 1620,
+      "Data Instalação Planejada": 1118,
+      "Recebimento Liberado": 1562,
+      "1º Contato": 2805,
+      "Pedido de Compra": 226,
+      "Início Instalação": 1069,
+      "Tempo de Instalação": 1085,
+      "Finalizado Instalação": 1848,
+      "Termo Entrega/Relatórios": 1272,
+      "Fotos/Vídeos": 829,
+      "Status QDT": 1394,
+      "Valor Líq Instalação": 1259,
+      "link to Aprovação de Pedidos": 3,
+      "Liberado Faturamento": 262,
+      "Data Liberação Faturamento": 287,
+      "Pedido Instalação Datasul": 74,
+      "Valor Pedido Instalação": 72,
+      "NF Instalador": 450,
+      "link to Assistência Técnica": 4
+    }
+  }
+}

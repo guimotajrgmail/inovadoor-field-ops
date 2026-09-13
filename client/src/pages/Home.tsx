@@ -57,6 +57,8 @@ type SectionKey =
   | "visao"
   | "ordens"
   | "agenda"
+  | "planejamento"
+  | "assistencia"
   | "clientes"
   | "equipamentos"
   | "formularios"
@@ -236,6 +238,8 @@ const navItems: NavItem[] = [
   { key: "visao", label: "Visão geral", icon: LayoutDashboard },
   { key: "ordens", label: "Ordens de serviço", icon: FileText, badge: "24" },
   { key: "agenda", label: "Agenda e despacho", icon: CalendarDays },
+  { key: "planejamento", label: "Planejamento de instalação", icon: Route },
+  { key: "assistencia", label: "Assistência técnica", icon: Ticket },
   { key: "clientes", label: "Clientes", icon: Factory },
   { key: "equipamentos", label: "Equipamentos", icon: Wrench },
   { key: "formularios", label: "Formulários", icon: ClipboardList, badge: "2" },

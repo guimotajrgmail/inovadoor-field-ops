@@ -33,6 +33,14 @@ import {
   listWorkOrderEvidence,
   listWorkOrders,
   listMondaySimulatedItems,
+  listInstallationPlans,
+  upsertInstallationPlan,
+  assignInstallationPlanVisibility,
+  acceptInstallationPlan,
+  listTechnicalRequests,
+  upsertTechnicalRequest,
+  updateTechnicalRequest,
+  convertTechnicalRequestToWorkOrder,
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -550,6 +558,134 @@ export const appRouter = router({
       ),
   }),
   integrations: router({
+    operations: router({
+      installationPlans: protectedProcedure.query(({ ctx }) =>
+        listInstallationPlans(
+          organizationIdFor(ctx.user),
+          ctx.user.accessProfile === "campo" ? ctx.user.email : null
+        )
+      ),
+      importInstallation: managerProcedure
+        .input(
+          z.object({
+            boardId: z.string().min(2).max(120),
+            mondayItemId: z.string().min(1).max(80),
+            title: z.string().min(2).max(240),
+            mondayStatus: z.string().max(80).optional(),
+            customerName: z.string().max(180).optional(),
+            location: z.string().max(240).optional(),
+            scheduledAt: z.date().optional(),
+            metadataJson: z.string().max(12000).optional(),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          upsertInstallationPlan({
+            ...input,
+            organizationId: organizationIdFor(ctx.user),
+          })
+        ),
+      assignInstallation: managerProcedure
+        .input(
+          z.object({
+            planId: z.number().int().positive(),
+            teamMemberId: z.number().int().positive(),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          assignInstallationPlanVisibility({
+            ...input,
+            organizationId: organizationIdFor(ctx.user),
+          })
+        ),
+      acceptInstallation: protectedProcedure
+        .input(z.object({ planId: z.number().int().positive() }))
+        .mutation(({ ctx, input }) => {
+          if (ctx.user.accessProfile !== "campo") {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Somente um instalador de campo pode aceitar a obra.",
+            });
+          }
+          if (!ctx.user.email) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "O instalador precisa ter e-mail cadastrado.",
+            });
+          }
+          return acceptInstallationPlan({
+            organizationId: organizationIdFor(ctx.user),
+            planId: input.planId,
+            memberEmail: ctx.user.email,
+          });
+        }),
+      technicalRequests: protectedProcedure.query(({ ctx }) =>
+        listTechnicalRequests(
+          organizationIdFor(ctx.user),
+          ctx.user.accessProfile === "terceiros"
+            ? (ctx.user.thirdPartyId ?? undefined)
+            : undefined
+        )
+      ),
+      importTechnicalRequest: managerProcedure
+        .input(
+          z.object({
+            boardId: z.string().min(2).max(120),
+            mondayItemId: z.string().min(1).max(80),
+            title: z.string().min(2).max(240),
+            customerName: z.string().max(180).optional(),
+            location: z.string().max(240).optional(),
+            equipment: z.string().max(180).optional(),
+            priority: z.enum(["baixa", "media", "alta", "critica"]).optional(),
+            notes: z.string().max(4000).optional(),
+            metadataJson: z.string().max(12000).optional(),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          upsertTechnicalRequest({
+            ...input,
+            organizationId: organizationIdFor(ctx.user),
+          })
+        ),
+      updateTechnicalRequest: managerProcedure
+        .input(
+          z.object({
+            id: z.number().int().positive(),
+            status: z
+              .enum([
+                "novo",
+                "triagem",
+                "agendado",
+                "em_execucao",
+                "concluido",
+                "cancelado",
+              ])
+              .optional(),
+            priority: z.enum(["baixa", "media", "alta", "critica"]).optional(),
+            assignedMemberId: z.number().int().positive().nullable().optional(),
+            assignedThirdPartyId: z
+              .number()
+              .int()
+              .positive()
+              .nullable()
+              .optional(),
+            notes: z.string().max(4000).nullable().optional(),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          updateTechnicalRequest({
+            ...input,
+            organizationId: organizationIdFor(ctx.user),
+          })
+        ),
+      convertTechnicalRequest: managerProcedure
+        .input(z.object({ id: z.number().int().positive() }))
+        .mutation(({ ctx, input }) =>
+          convertTechnicalRequestToWorkOrder({
+            ...input,
+            organizationId: organizationIdFor(ctx.user),
+          })
+        ),
+    }),
     monday: router({
       status: protectedProcedure.query(({ ctx }) =>
         getIntegrationConnection(organizationIdFor(ctx.user), "monday")

@@ -279,6 +279,80 @@ export const workOrderEvidence = mysqlTable("workOrderEvidence", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const installationPlans = mysqlTable("installationPlans", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  boardId: varchar("boardId", { length: 80 }).notNull(),
+  mondayItemId: varchar("mondayItemId", { length: 80 }).notNull().unique(),
+  title: varchar("title", { length: 240 }).notNull(),
+  mondayStatus: varchar("mondayStatus", { length: 80 }),
+  status: mysqlEnum("status", [
+    "disponivel",
+    "aceita",
+    "em_execucao",
+    "concluida",
+    "cancelada",
+  ])
+    .default("disponivel")
+    .notNull(),
+  customerName: varchar("customerName", { length: 180 }),
+  location: varchar("location", { length: 240 }),
+  scheduledAt: timestamp("scheduledAt"),
+  acceptedByMemberId: int("acceptedByMemberId"),
+  acceptedAt: timestamp("acceptedAt"),
+  workOrderId: int("workOrderId"),
+  metadataJson: text("metadataJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const installationPlanVisibility = mysqlTable(
+  "installationPlanVisibility",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    planId: int("planId").notNull(),
+    teamMemberId: int("teamMemberId").notNull(),
+    state: mysqlEnum("state", ["visivel", "aceita", "recusada"])
+      .default("visivel")
+      .notNull(),
+    acceptedAt: timestamp("acceptedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  }
+);
+
+export const technicalRequests = mysqlTable("technicalRequests", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  boardId: varchar("boardId", { length: 80 }).notNull(),
+  mondayItemId: varchar("mondayItemId", { length: 80 }).notNull().unique(),
+  title: varchar("title", { length: 240 }).notNull(),
+  status: mysqlEnum("status", [
+    "novo",
+    "triagem",
+    "agendado",
+    "em_execucao",
+    "concluido",
+    "cancelado",
+  ])
+    .default("novo")
+    .notNull(),
+  priority: mysqlEnum("priority", ["baixa", "media", "alta", "critica"])
+    .default("media")
+    .notNull(),
+  customerName: varchar("customerName", { length: 180 }),
+  location: varchar("location", { length: 240 }),
+  equipment: varchar("equipment", { length: 180 }),
+  assignedMemberId: int("assignedMemberId"),
+  assignedThirdPartyId: int("assignedThirdPartyId"),
+  workOrderId: int("workOrderId"),
+  notes: text("notes"),
+  metadataJson: text("metadataJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type WorkOrder = typeof workOrders.$inferSelect;

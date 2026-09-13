@@ -1,0 +1,116 @@
+﻿origem,coluna_original,tipo_monday_sugerido,id_tecnico_sugerido,observacao
+assistencia,Name,name,name,Coluna nativa; não criar
+assistencia,Subitems,text,assistencia_data_1,Coluna de texto
+assistencia,Qual a NC?,text,assistencia_data_2,Coluna de texto
+assistencia,Ticket,text,assistencia_data_3,Coluna de texto
+assistencia,Info de Abertura,text,assistencia_data_4,Coluna de texto
+assistencia,Status Atendimento,status,assistencia_status,Preservar rótulos da planilha
+assistencia,Creation Log,text,assistencia_data_6,Coluna de texto
+assistencia,Pedido de Origem,text,assistencia_data_7,Coluna de texto
+assistencia,Cliente Origem,text,assistencia_data_8,Coluna de texto
+assistencia,Porta,text,assistencia_data_9,Coluna de texto
+assistencia,Expedição Pedido Origem,text,assistencia_data_10,Coluna de texto
+assistencia,Via,text,assistencia_data_11,Coluna de texto
+assistencia,Resp. Atendimento,text,assistencia_data_12,Coluna de texto
+assistencia,Contato,text,assistencia_data_13,Coluna de texto
+assistencia,Phone,numbers/text,assistencia_data_14,Usar número somente quando todos os valores forem numéricos; caso contrário texto
+assistencia,Email,text,assistencia_data_15,Coluna de texto
+assistencia,Tipo de Atendimento,text,assistencia_data_16,Coluna de texto
+assistencia,Tipo NQ,text,assistencia_data_17,Coluna de texto
+assistencia,Envio de Material,text,assistencia_data_18,Coluna de texto
+assistencia,Envio de Equipe,text,assistencia_data_19,Coluna de texto
+assistencia,Região,text,assistencia_data_20,Coluna de texto
+assistencia,Estado,text,assistencia_data_21,Coluna de texto
+assistencia,Localização,text,assistencia_data_22,Coluna de texto
+assistencia,Fotos/Vídeo,link,assistencia_link_23,Manter URLs e referências em coluna de link/texto
+assistencia,Ação de Contenção,text,assistencia_data_24,Coluna de texto
+assistencia,Validação da AC,text,assistencia_data_25,Coluna de texto
+assistencia,Retorno Material,text,assistencia_data_26,Coluna de texto
+assistencia,Estoque,text,assistencia_data_27,Coluna de texto
+assistencia,Data Conclusão,date,assistencia_date_28,Converter datas reconhecíveis; manter texto quando houver múltiplas datas
+assistencia,Status Análise,status,assistencia_status,Preservar rótulos da planilha
+assistencia,Grupo da NQ,text,assistencia_data_30,Coluna de texto
+assistencia,Setor Raíz NQ,text,assistencia_data_31,Coluna de texto
+assistencia,Plano de Ação NQ,text,assistencia_data_32,Coluna de texto
+assistencia,Pedido de Garantia,text,assistencia_data_33,Coluna de texto
+assistencia,Data de Emissão,date,assistencia_date_34,Converter datas reconhecíveis; manter texto quando houver múltiplas datas
+assistencia,Cliente,text,assistencia_data_35,Coluna de texto
+assistencia,Valor do Pedido,numbers/text,assistencia_data_36,Usar número somente quando todos os valores forem numéricos; caso contrário texto
+assistencia,Arquivo do Pedido,link,assistencia_link_37,Manter URLs e referências em coluna de link/texto
+assistencia,Aprovação Gestor,text,assistencia_data_38,Coluna de texto
+assistencia,Aprovação Controladoria,text,assistencia_data_39,Coluna de texto
+assistencia,Revisão,text,assistencia_data_40,Coluna de texto
+assistencia,Status Pedido,status,assistencia_status,Preservar rótulos da planilha
+assistencia,Código Fornecedor NQ,text,assistencia_data_42,Coluna de texto
+assistencia,Nome Fornecedor NQ,text,assistencia_data_43,Coluna de texto
+assistencia,SLA Atendimento,numbers/text,assistencia_data_44,Usar número somente quando todos os valores forem numéricos; caso contrário texto
+assistencia,SLA Expedição,numbers/text,assistencia_data_45,Usar número somente quando todos os valores forem numéricos; caso contrário texto
+assistencia,Data Instalação Planejada,date,assistencia_date_46,Converter datas reconhecíveis; manter texto quando houver múltiplas datas
+assistencia,Link to Dev. Clientes NQ,link,assistencia_link_47,Manter URLs e referências em coluna de link/texto
+assistencia,Valor Estornado NQ,numbers/text,assistencia_data_48,Usar número somente quando todos os valores forem numéricos; caso contrário texto
+assistencia,Situação do Item NQ,status,assistencia_status,Preservar rótulos da planilha
+assistencia,Em Andamento/Concluído,status,assistencia_status,Preservar rótulos da planilha
+assistencia,Follow,text,assistencia_data_51,Coluna de texto
+assistencia,Data Expedição,date,assistencia_date_52,Converter datas reconhecíveis; manter texto quando houver múltiplas datas
+assistencia,VALOR FRETE,numbers/text,assistencia_data_53,Usar número somente quando todos os valores forem numéricos; caso contrário texto
+assistencia,Valor Total Ticket,numbers/text,assistencia_data_54,Usar número somente quando todos os valores forem numéricos; caso contrário texto
+assistencia,Equipe,text,assistencia_data_55,Coluna de texto
+assistencia,ORÇAMENTO MONTADOR,text,assistencia_data_56,Coluna de texto
+assistencia,Termo de Entrega,link,assistencia_link_57,Manter URLs e referências em coluna de link/texto
+assistencia,Formula,text,assistencia_data_58,Coluna de texto
+assistencia,Planejamento Instalação,text,assistencia_data_59,Coluna de texto
+assistencia,Valor MO,numbers/text,assistencia_data_60,Usar número somente quando todos os valores forem numéricos; caso contrário texto
+planejamento,Name,name,name,Coluna nativa; não criar
+planejamento,Subitems,text,planejamento_data_1,Coluna de texto
+planejamento,Data Pgto NF,date,planejamento_date_2,Converter datas reconhecíveis; manter texto quando houver múltiplas datas
+planejamento,item,text,planejamento_data_3,Coluna de texto
+planejamento,Cliente,text,planejamento_data_4,Coluna de texto
+planejamento,Status Instalação,status,planejamento_status,Preservar rótulos da planilha
+planejamento,Tipo,text,planejamento_data_6,Coluna de texto
+planejamento,Link Comercial,link,planejamento_link_7,Manter URLs e referências em coluna de link/texto
+planejamento,Ticket Assistência,text,planejamento_data_8,Coluna de texto
+planejamento,Obra Grande,text,planejamento_data_9,Coluna de texto
+planejamento,Contato Obra,text,planejamento_data_10,Coluna de texto
+planejamento,Telefone Obra,numbers/text,planejamento_data_11,Usar número somente quando todos os valores forem numéricos; caso contrário texto
+planejamento,E-mail Obra,text,planejamento_data_12,Coluna de texto
+planejamento,Obra com contrato,text,planejamento_data_13,Coluna de texto
+planejamento,Valor Líq. Equipamentos,numbers/text,planejamento_data_14,Usar número somente quando todos os valores forem numéricos; caso contrário texto
+planejamento,Pedido Compra - Servi;co,text,planejamento_data_15,Coluna de texto
+planejamento,Programador,text,planejamento_data_16,Coluna de texto
+planejamento,Região de Instalação,text,planejamento_data_17,Coluna de texto
+planejamento,Estado,text,planejamento_data_18,Coluna de texto
+planejamento,Localização,text,planejamento_data_19,Coluna de texto
+planejamento,Timeline Instalação - Start,date,planejamento_date_20,Converter datas reconhecíveis; manter texto quando houver múltiplas datas
+planejamento,Timeline Instalação - End,date,planejamento_date_21,Converter datas reconhecíveis; manter texto quando houver múltiplas datas
+planejamento,Equipe,text,planejamento_data_22,Coluna de texto
+planejamento,link to Follow,link,planejamento_link_23,Manter URLs e referências em coluna de link/texto
+planejamento,Valor Total,numbers/text,planejamento_data_24,Usar número somente quando todos os valores forem numéricos; caso contrário texto
+planejamento,Pedido,text,planejamento_data_25,Coluna de texto
+planejamento,Previsão  Expedição,text,planejamento_data_26,Coluna de texto
+planejamento,Data Expedição,date,planejamento_date_27,Converter datas reconhecíveis; manter texto quando houver múltiplas datas
+planejamento,Qtd Portas,numbers/text,planejamento_data_28,Usar número somente quando todos os valores forem numéricos; caso contrário texto
+planejamento,Modelo,text,planejamento_data_29,Coluna de texto
+planejamento,Tipo Follow,text,planejamento_data_30,Coluna de texto
+planejamento,QDT,text,planejamento_data_31,Coluna de texto
+planejamento,Proj. Adequação,text,planejamento_data_32,Coluna de texto
+planejamento,Status Follow,status,planejamento_status,Preservar rótulos da planilha
+planejamento,Prazo Cliente,date,planejamento_date_34,Converter datas reconhecíveis; manter texto quando houver múltiplas datas
+planejamento,Data Instalação Planejada,date,planejamento_date_35,Converter datas reconhecíveis; manter texto quando houver múltiplas datas
+planejamento,Recebimento Liberado,text,planejamento_data_36,Coluna de texto
+planejamento,1º Contato,text,planejamento_data_37,Coluna de texto
+planejamento,Pedido de Compra,text,planejamento_data_38,Coluna de texto
+planejamento,Início Instalação,text,planejamento_data_39,Coluna de texto
+planejamento,Tempo de Instalação,text,planejamento_data_40,Coluna de texto
+planejamento,Finalizado Instalação,text,planejamento_data_41,Coluna de texto
+planejamento,Termo Entrega/Relatórios,link,planejamento_link_42,Manter URLs e referências em coluna de link/texto
+planejamento,Fotos/Vídeos,link,planejamento_link_43,Manter URLs e referências em coluna de link/texto
+planejamento,Status QDT,status,planejamento_status,Preservar rótulos da planilha
+planejamento,Valor Líq Instalação,numbers/text,planejamento_data_45,Usar número somente quando todos os valores forem numéricos; caso contrário texto
+planejamento,link to Aprovação de Pedidos,link,planejamento_link_46,Manter URLs e referências em coluna de link/texto
+planejamento,Liberado Faturamento,text,planejamento_data_47,Coluna de texto
+planejamento,Data Liberação Faturamento,date,planejamento_date_48,Converter datas reconhecíveis; manter texto quando houver múltiplas datas
+planejamento,Pedido Instalação Datasul,date,planejamento_date_49,Converter datas reconhecíveis; manter texto quando houver múltiplas datas
+planejamento,Valor Pedido Instalação,numbers/text,planejamento_data_50,Usar número somente quando todos os valores forem numéricos; caso contrário texto
+planejamento,NF Instalador,text,planejamento_data_51,Coluna de texto
+planejamento,Data Pgto NF,date,planejamento_date_52,Converter datas reconhecíveis; manter texto quando houver múltiplas datas
+planejamento,link to Assistência Técnica,link,planejamento_link_53,Manter URLs e referências em coluna de link/texto
