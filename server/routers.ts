@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -63,7 +63,9 @@ import {
   syncWorkOrderToMonday,
   updateWorkOrderStatus,
   upsertMondayConnection,
+  authenticateLocalUser,
 } from "./db";
+import { sdk } from "./_core/sdk";
 
 const organizationIdFor = (user: { organizationId?: number | null }) =>
   user.organizationId ?? 1;
@@ -83,7 +85,47 @@ const optionalId = z.number().int().positive().optional();
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(opts => {
+      const user = opts.ctx.user;
+      if (!user) return null;
+      const {
+        passwordHash: _passwordHash,
+        passwordSalt: _passwordSalt,
+        ...safeUser
+      } = user;
+      return safeUser;
+    }),
+    localLogin: publicProcedure
+      .input(
+        z.object({
+          email: z.string().email(),
+          password: z.string().min(8).max(200),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const user = await authenticateLocalUser(input.email, input.password);
+        if (!user) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "E-mail, senha ou status de acesso inválido.",
+          });
+        }
+        const sessionToken = await sdk.createSessionToken(user.openId, {
+          name: user.name || user.email || "Usuário Inovadoor",
+          expiresInMs: ONE_YEAR_MS,
+        });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, {
+          ...cookieOptions,
+          maxAge: ONE_YEAR_MS,
+        });
+        const {
+          passwordHash: _passwordHash,
+          passwordSalt: _passwordSalt,
+          ...safeUser
+        } = user;
+        return { success: true, user: safeUser } as const;
+      }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -415,6 +457,7 @@ export const appRouter = router({
         z.object({
           name: z.string().min(2).max(180),
           email: z.string().email(),
+          password: z.string().min(8).max(200),
           phone: z.string().max(40).optional(),
           profile: z.enum(["gestao", "coordenacao", "campo", "terceiro"]),
           area: z.string().max(120).optional(),
@@ -434,6 +477,7 @@ export const appRouter = router({
           name: z.string().min(2).max(180).optional(),
           email: z.string().email().optional(),
           phone: z.string().max(40).optional(),
+          password: z.string().min(8).max(200).optional(),
           profile: z
             .enum(["gestao", "coordenacao", "campo", "terceiro"])
             .optional(),

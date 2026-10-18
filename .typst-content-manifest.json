@@ -1,0 +1,14 @@
+{
+  "task_kind": "markdown-to-pdf",
+  "output": "pdf",
+  "signals": ["professional report", "technical test manual"],
+  "hard_constraints": ["Brazilian Portuguese", "sequential test flow", "complete functional coverage"],
+  "content_features": {
+    "code_blocks": 0,
+    "defined_terms": 0,
+    "portrait_images": 0,
+    "tables": 6,
+    "checklists": 3,
+    "longform_sections": 21
+  }
+}

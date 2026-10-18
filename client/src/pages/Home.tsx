@@ -916,10 +916,12 @@ function Dashboard({
   store,
   onNavigate,
   onNewTicket,
+  displayName = "Beatriz",
 }: {
   store: DemoStore;
   onNavigate: (section: SectionKey) => void;
   onNewTicket: () => void;
+  displayName?: string;
 }) {
   const open = store.workOrders.filter(
     order => !["Concluída", "Cancelada"].includes(order.status)
@@ -937,7 +939,7 @@ function Dashboard({
     <>
       <SectionHeading
         eyebrow="Operação · segunda-feira"
-        title="Bom dia, Beatriz"
+        title={`Bom dia, ${displayName}`}
         description="Acompanhe a operação de portas industriais em tempo real."
         action={
           <div className="flex items-center gap-2">
@@ -1814,9 +1816,11 @@ function ThirdPartiesPage({
 }
 
 function PeoplePage({ store, onAdd }: { store: DemoStore; onAdd: () => void }) {
+  const auth = useAuth();
   const authenticated =
-    typeof window !== "undefined" &&
-    Boolean(window.sessionStorage.getItem("manus-cookie"));
+    Boolean(auth.user) ||
+    (typeof window !== "undefined" &&
+      Boolean(window.sessionStorage.getItem("manus-cookie")));
   const remotePeople = trpc.people.list.useQuery(undefined, {
     enabled: authenticated,
     retry: false,
@@ -4121,7 +4125,10 @@ function LoginPanel({
 }: {
   role: RoleKey;
   setRole: (role: RoleKey) => void;
-  onEnter: (credentials: { email: string; password: string }) => void;
+  onEnter: (credentials: {
+    email: string;
+    password: string;
+  }) => void | Promise<void>;
   onRealLogin: () => void;
   error?: string;
 }) {
@@ -4276,9 +4283,9 @@ function LoginPanel({
             </p>
           )}
           <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-center text-[11px] text-amber-800">
-            Acesso demonstrativo ADM: <strong>admin@inovadoor.com.br</strong> ·
-            senha <strong>Inovadoor@2026</strong>. Para produção, use o login
-            OAuth real.
+            Acesso local inicial ADM: <strong>admin@inovadoor.com.br</strong> ·
+            senha <strong>Inovadoor@2026</strong>. A Gestão pode cadastrar e
+            bloquear os demais acessos em Pessoas.
           </p>
           <button
             onClick={onRealLogin}
@@ -4302,12 +4309,14 @@ function InputField({
   onChange,
   placeholder,
   required = false,
+  type = "text",
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   required?: boolean;
+  type?: "text" | "password" | "email" | "number";
 }) {
   return (
     <label className="block">
@@ -4316,6 +4325,7 @@ function InputField({
         {required && <span className="text-orange-600"> *</span>}
       </span>
       <input
+        type={type}
         value={value}
         required={required}
         onChange={event => onChange(event.target.value)}
@@ -5092,9 +5102,9 @@ function CreateModal({
           {modal === "person" && (
             <>
               <div className="sm:col-span-2 rounded-xl border border-orange-100 bg-orange-50/70 p-3 text-xs leading-5 text-orange-800">
-                Defina o nível de acesso e o status. O acesso real usa Manus
-                OAuth; a credencial administrativa demonstrativa fica disponível
-                na tela inicial.
+                Defina o nível de acesso, o status e uma senha inicial. A pessoa
+                poderá entrar diretamente com e-mail e senha; o OAuth continua
+                disponível como alternativa.
               </div>
               <InputField
                 label="Nome completo"
@@ -5109,6 +5119,22 @@ function CreateModal({
                 value={values.email ?? ""}
                 onChange={value => update("email", value)}
                 placeholder="pessoa@empresa.com.br"
+              />
+              <InputField
+                label="Senha inicial"
+                required
+                type="password"
+                value={values.password ?? ""}
+                onChange={value => update("password", value)}
+                placeholder="Mínimo de 8 caracteres"
+              />
+              <InputField
+                label="Confirmar senha"
+                required
+                type="password"
+                value={values.passwordConfirmation ?? ""}
+                onChange={value => update("passwordConfirmation", value)}
+                placeholder="Repita a senha"
               />
               <InputField
                 label="Telefone"
@@ -5433,6 +5459,7 @@ function FormPreview({
 
 export default function Home() {
   const auth = useAuth();
+  const localLoginMutation = trpc.auth.localLogin.useMutation();
   const customerMutation = trpc.customers.create.useMutation();
   const thirdPartyMutation = trpc.thirdParties.create.useMutation();
   const personMutation = trpc.people.create.useMutation();
@@ -5454,8 +5481,9 @@ export default function Home() {
   const notificationsAllReadMutation =
     trpc.notifications.markAllRead.useMutation();
   const authenticated =
-    typeof window !== "undefined" &&
-    Boolean(window.sessionStorage.getItem("manus-cookie"));
+    Boolean(auth.user) ||
+    (typeof window !== "undefined" &&
+      Boolean(window.sessionStorage.getItem("manus-cookie")));
   const [activeRole, setActiveRole] = useState<RoleKey>("gestao");
   const [activeSection, setActiveSection] = useState<SectionKey>("visao");
   const [showLogin, setShowLogin] = useState(false);
@@ -5562,6 +5590,7 @@ export default function Home() {
   );
   const roleLabel =
     roles.find(item => item.key === activeRole)?.label ?? "Gestão Inovadoor";
+  const greetingName = auth.user?.name?.split(" ")[0] || "Beatriz";
   const navigate = (section: SectionKey) => {
     if (!allowedSections.has(section)) {
       setToast("Este módulo não está disponível para o perfil atual.");
@@ -5896,11 +5925,20 @@ export default function Home() {
         setToast("Informe nome e e-mail para cadastrar a pessoa.");
         return;
       }
+      if (!payload.password || payload.password.length < 8) {
+        setToast("Defina uma senha com pelo menos 8 caracteres.");
+        return;
+      }
+      if (payload.password !== payload.passwordConfirmation) {
+        setToast("A confirmação da senha não confere.");
+        return;
+      }
       if (authenticated) {
         try {
           await personMutation.mutateAsync({
             name: payload.name,
             email: payload.email,
+            password: payload.password,
             phone: payload.phone || undefined,
             area: payload.area || undefined,
             profile: (payload.profile || "campo") as
@@ -5914,7 +5952,7 @@ export default function Home() {
               | "inativo",
           });
           setToast(
-            "Pessoa cadastrada. O acesso será liberado conforme o status e o login OAuth."
+            "Pessoa cadastrada. O acesso usa o e-mail e a senha informados quando o status estiver ativo."
           );
         } catch {
           setToast(
@@ -6209,32 +6247,47 @@ export default function Home() {
         setRole={setActiveRole}
         error={loginError}
         onRealLogin={startLogin}
-        onEnter={({ email, password }) => {
-          if (
-            activeRole === "gestao" &&
-            (email.trim().toLowerCase() !== "admin@inovadoor.com.br" ||
-              password !== "Inovadoor@2026")
-          ) {
-            setLoginError(
-              "Credenciais ADM inválidas. Use admin@inovadoor.com.br e a senha cadastrada."
-            );
-            return;
-          }
-          setLoginError("");
-          setShowLogin(false);
-          window.sessionStorage.setItem("inovadoor-demo-auth", "admin");
-          if (activeRole === "campo") return;
-          if (activeRole === "cliente") return;
-          setActiveSection(
-            activeRole === "pessoas"
-              ? "pessoas"
-              : activeRole === "terceiros"
+        onEnter={async ({ email, password }) => {
+          try {
+            const result = await localLoginMutation.mutateAsync({
+              email: email.trim().toLowerCase(),
+              password,
+            });
+            try {
+              window.sessionStorage.setItem(
+                "manus-cookie",
+                document.cookie || "local-session"
+              );
+            } catch {
+              // The HTTP-only cookie still authenticates requests.
+            }
+            await auth.refresh();
+            const nextRole =
+              result.user.accessProfile === "terceiros"
                 ? "terceiros"
-                : "visao"
-          );
-          setToast(
-            `Acesso iniciado: ${roles.find(role => role.key === activeRole)?.label}`
-          );
+                : result.user.accessProfile === "pessoas"
+                  ? "pessoas"
+                  : result.user.accessProfile === "campo"
+                    ? "campo"
+                    : result.user.accessProfile === "cliente"
+                      ? "cliente"
+                      : "gestao";
+            setActiveRole(nextRole);
+            setLoginError("");
+            setShowLogin(false);
+            setActiveSection(
+              nextRole === "pessoas"
+                ? "pessoas"
+                : nextRole === "terceiros"
+                  ? "terceiros"
+                  : "visao"
+            );
+            setToast(
+              `Acesso iniciado: ${result.user.name || result.user.email}`
+            );
+          } catch {
+            setLoginError("E-mail, senha ou status de acesso inválido.");
+          }
         }}
       />
     );
@@ -6291,6 +6344,7 @@ export default function Home() {
           store={store}
           onNavigate={navigate}
           onNewTicket={() => openModal("ticket")}
+          displayName={greetingName}
         />
       );
     switch (activeSection) {
@@ -6300,6 +6354,7 @@ export default function Home() {
             store={store}
             onNavigate={navigate}
             onNewTicket={() => openModal("ticket")}
+            displayName={greetingName}
           />
         );
       case "ordens":

@@ -1,5 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import {
   customers,
   customerContacts,
@@ -121,7 +122,17 @@ export async function assignUserScope(input: {
     })
     .where(eq(users.id, input.userId));
   const result = await db
-    .select()
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      accessProfile: users.accessProfile,
+      organizationId: users.organizationId,
+      customerId: users.customerId,
+      thirdPartyId: users.thirdPartyId,
+      active: users.active,
+    })
     .from(users)
     .where(eq(users.id, input.userId))
     .limit(1);
@@ -141,10 +152,88 @@ export async function listOrganizationUsers(organizationId: number) {
       lastSignedIn: users.lastSignedIn,
       customerId: users.customerId,
       thirdPartyId: users.thirdPartyId,
+      active: users.active,
     })
     .from(users)
     .where(eq(users.organizationId, organizationId))
     .orderBy(users.name);
+}
+
+const LOCAL_ADMIN_EMAIL = "admin@inovadoor.com.br";
+const LOCAL_ADMIN_PASSWORD = "Inovadoor@2026";
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+export function hashLocalPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return { hash, salt };
+}
+
+function profileToAccessProfile(
+  profile: "gestao" | "coordenacao" | "campo" | "terceiro"
+): "gestao" | "terceiros" | "pessoas" | "campo" {
+  if (profile === "terceiro") return "terceiros";
+  if (profile === "coordenacao") return "pessoas";
+  return profile;
+}
+
+function verifyLocalPassword(password: string, hash: string, salt: string) {
+  const expected = Buffer.from(hash, "hex");
+  const actual = scryptSync(password, salt, 64);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+async function ensureLocalAdmin() {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, LOCAL_ADMIN_EMAIL))
+    .limit(1);
+  if (existing[0]) return;
+  const credentials = hashLocalPassword(LOCAL_ADMIN_PASSWORD);
+  await db.insert(users).values({
+    openId: `local:${LOCAL_ADMIN_EMAIL}`,
+    name: "Administrador Inovadoor",
+    email: LOCAL_ADMIN_EMAIL,
+    loginMethod: "local",
+    passwordHash: credentials.hash,
+    passwordSalt: credentials.salt,
+    active: 1,
+    role: "admin",
+    accessProfile: "gestao",
+    organizationId: 1,
+  });
+}
+
+export async function authenticateLocalUser(email: string, password: string) {
+  await ensureLocalAdmin();
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, normalizeEmail(email)))
+    .limit(1);
+  const user = rows[0];
+  if (
+    !user ||
+    user.active !== 1 ||
+    !user.passwordHash ||
+    !user.passwordSalt ||
+    !verifyLocalPassword(password, user.passwordHash, user.passwordSalt)
+  ) {
+    return null;
+  }
+  await db
+    .update(users)
+    .set({ lastSignedIn: new Date() })
+    .where(eq(users.id, user.id));
+  return user;
 }
 
 export async function listNotifications(
@@ -821,24 +910,64 @@ export async function createTeamMember(input: {
   name: string;
   email: string;
   phone?: string;
+  password: string;
   profile: "gestao" | "coordenacao" | "campo" | "terceiro";
   area?: string;
   status?: "ativo" | "pendente" | "inativo";
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
+  const email = normalizeEmail(input.email);
+  const credentials = hashLocalPassword(input.password);
   await db.insert(teamMembers).values({
-    ...input,
+    organizationId: input.organizationId,
+    name: input.name,
+    email,
+    phone: input.phone,
+    profile: input.profile,
     area: input.area || "Operações de campo",
     status: input.status || "pendente",
   });
+  const existingUser = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+  const accessProfile = profileToAccessProfile(input.profile);
+  const active = input.status === "ativo" ? 1 : 0;
+  if (existingUser[0]) {
+    await db
+      .update(users)
+      .set({
+        name: input.name,
+        loginMethod: "local",
+        passwordHash: credentials.hash,
+        passwordSalt: credentials.salt,
+        active,
+        accessProfile,
+        organizationId: input.organizationId,
+      })
+      .where(eq(users.id, existingUser[0].id));
+  } else {
+    await db.insert(users).values({
+      openId: `local:${email}`,
+      name: input.name,
+      email,
+      loginMethod: "local",
+      passwordHash: credentials.hash,
+      passwordSalt: credentials.salt,
+      active,
+      accessProfile,
+      organizationId: input.organizationId,
+    });
+  }
   const rows = await db
     .select()
     .from(teamMembers)
     .where(
       and(
         eq(teamMembers.organizationId, input.organizationId),
-        eq(teamMembers.email, input.email)
+        eq(teamMembers.email, email)
       )
     )
     .orderBy(desc(teamMembers.id))
@@ -852,13 +981,27 @@ export async function updateTeamMember(input: {
   name?: string;
   email?: string;
   phone?: string;
+  password?: string;
   profile?: "gestao" | "coordenacao" | "campo" | "terceiro";
   area?: string;
   status?: "ativo" | "pendente" | "inativo";
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
-  const { id, organizationId, ...changes } = input;
+  const currentRows = await db
+    .select()
+    .from(teamMembers)
+    .where(
+      and(
+        eq(teamMembers.id, input.id),
+        eq(teamMembers.organizationId, input.organizationId)
+      )
+    )
+    .limit(1);
+  const current = currentRows[0];
+  if (!current) return undefined;
+  const { id, organizationId, password, ...changes } = input;
+  if (changes.email) changes.email = normalizeEmail(changes.email);
   await db
     .update(teamMembers)
     .set(changes)
@@ -866,6 +1009,26 @@ export async function updateTeamMember(input: {
       and(
         eq(teamMembers.id, id),
         eq(teamMembers.organizationId, organizationId)
+      )
+    );
+  const credentialChanges: Record<string, unknown> = {
+    name: changes.name ?? current.name,
+    email: changes.email ?? current.email,
+    accessProfile: profileToAccessProfile(changes.profile ?? current.profile),
+    active: (changes.status ?? current.status) === "ativo" ? 1 : 0,
+  };
+  if (password) {
+    const credentials = hashLocalPassword(password);
+    credentialChanges.passwordHash = credentials.hash;
+    credentialChanges.passwordSalt = credentials.salt;
+  }
+  await db
+    .update(users)
+    .set(credentialChanges)
+    .where(
+      and(
+        eq(users.email, current.email),
+        eq(users.organizationId, organizationId)
       )
     );
   const rows = await db
