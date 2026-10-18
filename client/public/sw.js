@@ -1,4 +1,4 @@
-const CACHE_NAME = "inovadoor-field-ops-v2";
+const CACHE_NAME = "inovadoor-field-ops-v3";
 const APP_SHELL = ["/", "/manifest.json"];
 
 self.addEventListener("install", event => {
@@ -15,6 +15,16 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
+  const requestPath = new URL(event.request.url).pathname;
+  const isDevAsset =
+    requestPath.startsWith("/src/") ||
+    requestPath.startsWith("/@fs/") ||
+    requestPath.startsWith("/@vite/") ||
+    requestPath.startsWith("/node_modules/");
+  if (isDevAsset) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
   const isNavigation = event.request.mode === "navigate" || event.request.headers.get("accept")?.includes("text/html");
   if (isNavigation) {
     event.respondWith(
