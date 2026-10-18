@@ -1,6 +1,5 @@
 import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
 import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
@@ -56,7 +55,7 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
   const logPath = path.join(LOG_DIR, `${source}.log`);
 
   // Format entries with timestamps
-  const lines = entries.map((entry) => {
+  const lines = entries.map(entry => {
     const ts = new Date().toISOString();
     return `[${ts}] ${JSON.stringify(entry)}`;
   });
@@ -132,7 +131,7 @@ function vitePluginManusDebugCollector(): Plugin {
         }
 
         let body = "";
-        req.on("data", (chunk) => {
+        req.on("data", chunk => {
           body += chunk.toString();
         });
 
@@ -150,7 +149,39 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+const reactPath = fs.realpathSync(
+  path.join(PROJECT_ROOT, "node_modules", "react")
+);
+const reactDomPath = fs.realpathSync(
+  path.join(PROJECT_ROOT, "node_modules", "react-dom")
+);
+
+const vitePreviewCompatibilityPlugin: Plugin = {
+  name: "manus-preview-no-vite-client",
+  enforce: "post",
+  transformIndexHtml(html) {
+    if (process.env.NODE_ENV !== "production") {
+      return html
+        .replace(
+          /\s*<script[^>]+src=["']\/@vite\/client["'][^>]*><\/script>/g,
+          ""
+        )
+        .replace(
+          /\s*<script[^>]*>\s*import\s*\{\s*injectIntoGlobalHook[\s\S]*?<\/script>/g,
+          ""
+        );
+    }
+    return html;
+  },
+};
+
+const plugins = [
+  tailwindcss(),
+  jsxLocPlugin(),
+  vitePluginManusRuntime(),
+  vitePluginManusDebugCollector(),
+  vitePreviewCompatibilityPlugin,
+];
 
 export default defineConfig({
   plugins,
@@ -159,8 +190,12 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
-      react: path.resolve(import.meta.dirname, "node_modules/react"),
-      "react-dom": path.resolve(import.meta.dirname, "node_modules/react-dom"),
+      react: reactPath,
+      "react/jsx-runtime": path.join(reactPath, "jsx-runtime.js"),
+      "react/jsx-dev-runtime": path.join(reactPath, "jsx-dev-runtime.js"),
+      "react-dom": reactDomPath,
+      "react-dom/client": path.join(reactDomPath, "client.js"),
+      "react-dom/server": path.join(reactDomPath, "server.browser.js"),
     },
     dedupe: ["react", "react-dom"],
   },
@@ -173,7 +208,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     force: true,
-    include: ["react", "react-dom", "@trpc/react-query"],
+    include: ["react", "react-dom", "react/jsx-runtime", "@trpc/react-query"],
+  },
+  esbuild: {
+    jsx: "automatic",
+    jsxImportSource: "react",
   },
   server: {
     host: true,
