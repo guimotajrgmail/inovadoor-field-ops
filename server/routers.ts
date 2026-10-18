@@ -27,6 +27,7 @@ import {
   duplicateCustomFormDefinition,
   linkEquipmentToCustomer,
   installEquipmentFromCatalog,
+  updateEquipmentDetails,
   listCustomers,
   listCustomerSegments,
   listCustomerContacts,
@@ -446,6 +447,24 @@ export const appRouter = router({
           input.installationLocation,
           input.serialNumber
         )
+      ),
+    updateDetails: managerProcedure
+      .input(
+        z.object({
+          equipmentId: z.number().int().positive(),
+          installationLocation: z.string().max(180).optional(),
+          environmentId: optionalId,
+          state: z
+            .enum(["operacional", "manutencao", "atencao", "baixado"])
+            .optional(),
+          notes: z.string().max(4000).optional(),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        updateEquipmentDetails({
+          ...input,
+          organizationId: organizationIdFor(ctx.user),
+        })
       ),
   }),
   people: router({

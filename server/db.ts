@@ -895,6 +895,44 @@ export async function linkEquipmentToCustomer(
   return rows[0];
 }
 
+export async function updateEquipmentDetails(input: {
+  organizationId: number;
+  equipmentId: number;
+  installationLocation?: string;
+  environmentId?: number;
+  state?: "operacional" | "manutencao" | "atencao" | "baixado";
+  notes?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db
+    .update(equipment)
+    .set({
+      installationLocation: input.installationLocation,
+      environmentId: input.environmentId,
+      state: input.state,
+      notes: input.notes,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(equipment.id, input.equipmentId),
+        eq(equipment.organizationId, input.organizationId)
+      )
+    );
+  const rows = await db
+    .select()
+    .from(equipment)
+    .where(
+      and(
+        eq(equipment.id, input.equipmentId),
+        eq(equipment.organizationId, input.organizationId)
+      )
+    )
+    .limit(1);
+  return rows[0];
+}
+
 export async function listTeamMembers(organizationId: number) {
   const db = await getDb();
   if (!db || !organizationId) return [];

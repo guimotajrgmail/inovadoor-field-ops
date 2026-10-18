@@ -1358,6 +1358,39 @@ function CustomersPage({
   store: DemoStore;
   onAdd: () => void;
 }) {
+  const authenticated =
+    typeof window !== "undefined" &&
+    Boolean(window.sessionStorage.getItem("manus-cookie"));
+  const remoteEquipment = trpc.equipment.list.useQuery(undefined, {
+    enabled: authenticated,
+    retry: false,
+  });
+  const updateEquipment = trpc.equipment.updateDetails.useMutation({
+    onSuccess: () => remoteEquipment.refetch(),
+  });
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    null
+  );
+  const equipment: Equipment[] =
+    remoteEquipment.data?.map(item => ({
+      id: String(item.id),
+      code: item.code,
+      name: item.name,
+      model: item.model || "—",
+      customerId: item.customerId ? String(item.customerId) : "",
+      standardId: item.catalogId ? String(item.catalogId) : undefined,
+      serialNumber: item.serialNumber || "—",
+      installationLocation: item.installationLocation || "—",
+      state:
+        item.state === "manutencao"
+          ? "Manutenção"
+          : item.state === "atencao"
+            ? "Atenção"
+            : "Operacional",
+      lastMaintenance: item.lastMaintenanceAt
+        ? new Date(item.lastMaintenanceAt).toLocaleDateString("pt-BR")
+        : "—",
+    })) ?? store.equipment;
   return (
     <>
       <SectionHeading
@@ -1374,7 +1407,16 @@ function CustomersPage({
         {store.customers.map(customer => (
           <div
             key={customer.id}
-            className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)]"
+            role="button"
+            tabIndex={0}
+            onClick={() => setSelectedCustomer(customer)}
+            onKeyDown={event => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setSelectedCustomer(customer);
+              }
+            }}
+            className="cursor-pointer rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_12px_35px_rgba(15,23,42,0.08)] focus:outline-none focus:ring-4 focus:ring-orange-100"
           >
             <div className="flex items-start justify-between">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
@@ -1419,10 +1461,7 @@ function CustomersPage({
               <div>
                 <p className="text-[10px] text-slate-400">Equipamentos</p>
                 <p className="mt-1 text-base font-bold text-slate-800">
-                  {
-                    store.equipment.filter(e => e.customerId === customer.id)
-                      .length
-                  }
+                  {equipment.filter(e => e.customerId === customer.id).length}
                 </p>
               </div>
               <div>
@@ -1435,10 +1474,225 @@ function CustomersPage({
                 </p>
               </div>
             </div>
+            <p className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-orange-600">
+              <PenLine className="h-3 w-3" /> Clique para ver e alterar
+              equipamentos
+            </p>
           </div>
         ))}
       </div>
+      {selectedCustomer && (
+        <CustomerEquipmentDialog
+          customer={selectedCustomer}
+          equipment={equipment.filter(
+            item => item.customerId === selectedCustomer.id
+          )}
+          environments={store.installationEnvironments}
+          authenticated={authenticated}
+          onSave={async input => {
+            if (authenticated && /^\\d+$/.test(input.equipmentId)) {
+              await updateEquipment.mutateAsync({
+                equipmentId: Number(input.equipmentId),
+                installationLocation: input.installationLocation || undefined,
+                environmentId: /^\\d+$/.test(input.environmentId || "")
+                  ? Number(input.environmentId)
+                  : undefined,
+                state: input.state,
+                notes: input.notes || undefined,
+              });
+            }
+          }}
+          onClose={() => setSelectedCustomer(null)}
+        />
+      )}
     </>
+  );
+}
+
+type CustomerEquipmentUpdate = {
+  equipmentId: string;
+  installationLocation: string;
+  environmentId: string;
+  state: "operacional" | "manutencao" | "atencao";
+  notes: string;
+};
+
+function CustomerEquipmentDialog({
+  customer,
+  equipment,
+  environments,
+  onSave,
+  onClose,
+}: {
+  customer: Customer;
+  equipment: Equipment[];
+  environments: InstallationEnvironment[];
+  authenticated: boolean;
+  onSave: (input: CustomerEquipmentUpdate) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState({
+    location: "",
+    environmentId: "",
+    state: "Operacional" as Equipment["state"],
+    notes: "",
+  });
+  const startEditing = (item: Equipment) => {
+    setEditingId(item.id);
+    setDraft({
+      location: item.installationLocation || "",
+      environmentId: item.environmentId || "",
+      state: item.state,
+      notes: "",
+    });
+  };
+  const save = async (item: Equipment) => {
+    await onSave({
+      equipmentId: item.id,
+      installationLocation: draft.location,
+      environmentId: draft.environmentId,
+      state:
+        draft.state === "Manutenção"
+          ? "manutencao"
+          : draft.state === "Atenção"
+            ? "atencao"
+            : "operacional",
+      notes: draft.notes,
+    });
+    setEditingId(null);
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-4 sm:items-center">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-orange-600">
+              Ativos do cliente
+            </p>
+            <h2 className="mt-1 font-display text-xl font-bold text-slate-950">
+              Equipamentos de {customer.name}
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Consulte as unidades vinculadas e altere somente os dados
+              operacionais. O número de série é permanente e não pode ser
+              editado.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-50"
+            aria-label="Fechar equipamentos do cliente"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        {equipment.length === 0 ? (
+          <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-sm text-slate-500">
+            Nenhum equipamento vinculado a este cliente.
+          </div>
+        ) : (
+          <div className="mt-6 space-y-3">
+            {equipment.map(item => (
+              <div
+                key={item.id}
+                className="rounded-xl border border-slate-200 bg-white p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-slate-800">{item.name}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {item.model} · {item.code}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-slate-100 px-3 py-2 text-right">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Número de série (bloqueado)
+                    </p>
+                    <p className="mt-1 font-mono text-xs font-bold text-slate-700">
+                      {item.serialNumber || "Não informado"}
+                    </p>
+                  </div>
+                </div>
+                {editingId === item.id ? (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <InputField
+                      label="Local da instalação"
+                      value={draft.location}
+                      onChange={value =>
+                        setDraft(current => ({ ...current, location: value }))
+                      }
+                      placeholder="Doca 05 · Galpão A"
+                    />
+                    <SelectField
+                      label="Ambiente"
+                      value={draft.environmentId}
+                      onChange={value =>
+                        setDraft(current => ({
+                          ...current,
+                          environmentId: value,
+                        }))
+                      }
+                      options={environments.map(environment => ({
+                        value: environment.id,
+                        label: environment.name,
+                      }))}
+                    />
+                    <SelectField
+                      label="Estado"
+                      value={draft.state}
+                      onChange={value =>
+                        setDraft(current => ({
+                          ...current,
+                          state: value as Equipment["state"],
+                        }))
+                      }
+                      options={["Operacional", "Manutenção", "Atenção"].map(
+                        value => ({ value, label: value })
+                      )}
+                    />
+                    <div className="flex items-end gap-2">
+                      <button
+                        onClick={() => void save(item)}
+                        className="rounded-xl bg-[#f36f21] px-4 py-2.5 text-xs font-bold text-white"
+                      >
+                        Salvar alterações
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                    <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                      <span className="rounded-full bg-slate-50 px-2.5 py-1">
+                        {item.installationLocation || "Local não informado"}
+                      </span>
+                      <StatusPill
+                        status={item.state}
+                        statusKey={
+                          item.state === "Operacional" ? "done" : "waiting"
+                        }
+                      />
+                    </div>
+                    <button
+                      onClick={() => startEditing(item)}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-orange-600 hover:bg-orange-50"
+                    >
+                      <PenLine className="h-3.5 w-3.5" /> Alterar dados
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1499,7 +1753,7 @@ function EquipmentPage({
       <SectionHeading
         eyebrow="Catálogo e ativos"
         title="Equipamentos"
-        description="Cadastre o padrão uma vez e depois instale unidades com cliente, local e número de série."
+        description="Cadastre o modelo uma vez e crie quantas unidades físicas precisar, cada uma com cliente e número de série próprios."
         action={
           <div className="flex flex-wrap gap-2">
             <button
@@ -1514,16 +1768,18 @@ function EquipmentPage({
               className="inline-flex items-center gap-2 rounded-xl bg-[#f36f21] px-3.5 py-2.5 text-xs font-semibold text-white shadow-lg shadow-orange-500/15"
             >
               <Plus className="h-3.5 w-3.5" />
-              Instalar no cliente
+              Criar unidade no cliente
             </button>
           </div>
         }
       />
       <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50/70 p-4 text-xs leading-5 text-blue-800">
-        <strong>Fluxo correto:</strong> 1) cadastre o equipamento padrão, como
-        “Porta rápida”; 2) instale uma unidade no cliente informando local e
-        número de série; 3) use o vínculo em chamados, OS e formulários. O
-        padrão não recebe cliente nem número de série.
+        <strong>Como funciona:</strong> 1) cadastre o modelo no catálogo, como
+        “Porta rápida”; 2) clique em <strong>Criar unidade no cliente</strong> e
+        escolha esse modelo; 3) informe o cliente, local e número de série da
+        porta física. Repita o passo 2 para instalar o mesmo modelo em vários
+        clientes, sempre usando um serial diferente. O botão de correção serve
+        somente para ajustar uma unidade que já foi criada.
       </div>
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
@@ -1569,7 +1825,7 @@ function EquipmentPage({
             onClick={onAddStandard}
             className="text-xs font-semibold text-orange-600"
           >
-            Cadastrar padrão
+            Novo equipamento padrão
           </button>
         </div>
         <div className="overflow-x-auto">
@@ -1606,7 +1862,7 @@ function EquipmentPage({
                       onClick={onInstall}
                       className="rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-orange-600 hover:bg-orange-50"
                     >
-                      Instalar
+                      Criar unidade
                     </button>
                   </td>
                 </tr>
@@ -1619,17 +1875,18 @@ function EquipmentPage({
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="font-display text-base font-bold text-slate-950">
-              Unidades instaladas
+              Unidades físicas vinculadas
             </h2>
             <p className="mt-1 text-xs text-slate-400">
-              Cada registro representa uma porta física em um cliente.
+              Cada registro representa uma unidade física do catálogo vinculada
+              a um cliente.
             </p>
           </div>
           <button
             onClick={onLink}
             className="text-xs font-semibold text-orange-600"
           >
-            Ajustar vínculo
+            Corrigir unidade existente
           </button>
         </div>
         <div className="overflow-x-auto">
@@ -4483,12 +4740,12 @@ function CreateModal({
   const title: Record<Exclude<ModalKey, null>, string> = {
     customer: "Cadastrar cliente",
     equipmentStandard: "Cadastrar equipamento padrão",
-    equipmentInstall: "Instalar equipamento no cliente",
+    equipmentInstall: "Criar unidade física no cliente",
     thirdParty: "Cadastrar terceiro",
     person: "Cadastrar pessoa e acesso",
     workOrder: "Criar ordem de serviço",
     ticket: "Abrir chamado",
-    link: "Ajustar vínculo equipamento–cliente",
+    link: "Corrigir unidade vinculada",
     form: "Gerar formulário operacional",
     customForm: "Criar formulário de cadastro",
   };
@@ -4939,9 +5196,15 @@ function CreateModal({
           )}
           {modal === "equipmentInstall" && (
             <>
+              <div className="sm:col-span-2 rounded-xl bg-orange-50 p-3 text-xs leading-5 text-orange-800">
+                Você está criando uma <strong>unidade física</strong>. Escolha
+                um modelo do catálogo, um cliente e informe um número de série
+                exclusivo. Para o mesmo modelo em outro cliente, salve e abra
+                este formulário novamente com outro serial.
+              </div>
               <div className="sm:col-span-2">
                 <SelectField
-                  label="Equipamento padrão"
+                  label="Modelo do catálogo"
                   value={values.standardId ?? ""}
                   onChange={value => update("standardId", value)}
                   options={store.equipmentStandards.map(item => ({
@@ -4952,7 +5215,7 @@ function CreateModal({
               </div>
               <div className="sm:col-span-2">
                 <SelectField
-                  label="Cliente / unidade"
+                  label="Cliente da nova unidade"
                   value={values.customerId ?? ""}
                   onChange={value => update("customerId", value)}
                   options={store.customers.map(customer => ({
@@ -4990,7 +5253,7 @@ function CreateModal({
             <>
               <div className="sm:col-span-2">
                 <SelectField
-                  label="Unidade instalada"
+                  label="Unidade física existente"
                   value={values.equipmentId ?? ""}
                   onChange={value => update("equipmentId", value)}
                   options={store.equipment.map(item => ({
@@ -5001,7 +5264,7 @@ function CreateModal({
               </div>
               <div className="sm:col-span-2">
                 <SelectField
-                  label="Cliente / unidade"
+                  label="Cliente corrigido"
                   value={values.customerId ?? ""}
                   onChange={value => update("customerId", value)}
                   options={store.customers.map(customer => ({
@@ -5764,6 +6027,9 @@ export default function Home() {
         ...current,
         equipmentStandards: [...current.equipmentStandards, item],
       }));
+      if (authenticated) {
+        await trpcUtils.equipment.standards.list.invalidate();
+      }
       setToast(
         "Equipamento padrão cadastrado. Agora instale uma unidade no cliente."
       );
@@ -5823,6 +6089,9 @@ export default function Home() {
         ...current,
         equipment: [...current.equipment, item],
       }));
+      if (authenticated) {
+        await trpcUtils.equipment.list.invalidate();
+      }
       setToast(
         `${item.name} instalado e vinculado ao cliente pelo serial ${serialNumber}.`
       );
@@ -5858,6 +6127,9 @@ export default function Home() {
             : item
         ),
       }));
+      if (authenticated) {
+        await trpcUtils.equipment.list.invalidate();
+      }
       setToast(
         "Vínculo equipamento–cliente atualizado com local e identificação."
       );
