@@ -815,6 +815,71 @@ export async function listTeamMembers(organizationId: number) {
     .orderBy(teamMembers.name);
 }
 
+export async function createTeamMember(input: {
+  organizationId: number;
+  name: string;
+  email: string;
+  phone?: string;
+  profile: "gestao" | "coordenacao" | "campo" | "terceiro";
+  area?: string;
+  status?: "ativo" | "pendente" | "inativo";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.insert(teamMembers).values({
+    ...input,
+    area: input.area || "Operações de campo",
+    status: input.status || "pendente",
+  });
+  const rows = await db
+    .select()
+    .from(teamMembers)
+    .where(
+      and(
+        eq(teamMembers.organizationId, input.organizationId),
+        eq(teamMembers.email, input.email)
+      )
+    )
+    .orderBy(desc(teamMembers.id))
+    .limit(1);
+  return rows[0];
+}
+
+export async function updateTeamMember(input: {
+  organizationId: number;
+  id: number;
+  name?: string;
+  email?: string;
+  phone?: string;
+  profile?: "gestao" | "coordenacao" | "campo" | "terceiro";
+  area?: string;
+  status?: "ativo" | "pendente" | "inativo";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const { id, organizationId, ...changes } = input;
+  await db
+    .update(teamMembers)
+    .set(changes)
+    .where(
+      and(
+        eq(teamMembers.id, id),
+        eq(teamMembers.organizationId, organizationId)
+      )
+    );
+  const rows = await db
+    .select()
+    .from(teamMembers)
+    .where(
+      and(
+        eq(teamMembers.id, id),
+        eq(teamMembers.organizationId, organizationId)
+      )
+    )
+    .limit(1);
+  return rows[0];
+}
+
 export async function listThirdParties(organizationId: number) {
   const db = await getDb();
   if (!db || !organizationId) return [];

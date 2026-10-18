@@ -17,6 +17,7 @@ import {
   createEquipmentCategory,
   createEquipmentManufacturer,
   createInstallationEnvironment,
+  createTeamMember,
   createWorkOrder,
   addWorkOrderEvidence,
   assignUserScope,
@@ -38,6 +39,7 @@ import {
   listInstallationEnvironments,
   listServiceFormTemplates,
   listTeamMembers,
+  updateTeamMember,
   listThirdParties,
   listThirdPartyContacts,
   listWorkOrderEvidence,
@@ -406,6 +408,43 @@ export const appRouter = router({
     list: protectedProcedure.query(({ ctx }) =>
       listTeamMembers(organizationIdFor(ctx.user))
     ),
+    create: managerProcedure
+      .input(
+        z.object({
+          name: z.string().min(2).max(180),
+          email: z.string().email(),
+          phone: z.string().max(40).optional(),
+          profile: z.enum(["gestao", "coordenacao", "campo", "terceiro"]),
+          area: z.string().max(120).optional(),
+          status: z.enum(["ativo", "pendente", "inativo"]).default("pendente"),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        createTeamMember({
+          organizationId: organizationIdFor(ctx.user),
+          ...input,
+        })
+      ),
+    update: managerProcedure
+      .input(
+        z.object({
+          id: z.number().int().positive(),
+          name: z.string().min(2).max(180).optional(),
+          email: z.string().email().optional(),
+          phone: z.string().max(40).optional(),
+          profile: z
+            .enum(["gestao", "coordenacao", "campo", "terceiro"])
+            .optional(),
+          area: z.string().max(120).optional(),
+          status: z.enum(["ativo", "pendente", "inativo"]).optional(),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        updateTeamMember({
+          organizationId: organizationIdFor(ctx.user),
+          ...input,
+        })
+      ),
   }),
   thirdParties: router({
     list: protectedProcedure.query(({ ctx }) =>

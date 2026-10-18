@@ -77,6 +77,7 @@ type ModalKey =
   | "workOrder"
   | "ticket"
   | "link"
+  | "person"
   | "form"
   | "customForm"
   | null;
@@ -140,8 +141,9 @@ type Person = {
   name: string;
   area: string;
   profile: string;
+  profileKey?: "gestao" | "coordenacao" | "campo" | "terceiro";
   last: string;
-  access: "Ativo" | "Pendente";
+  access: "Ativo" | "Pendente" | "Inativo";
 };
 type WorkOrder = {
   id: string;
@@ -1796,29 +1798,42 @@ function PeoplePage({ store, onAdd }: { store: DemoStore; onAdd: () => void }) {
   const authenticated =
     typeof window !== "undefined" &&
     Boolean(window.sessionStorage.getItem("manus-cookie"));
-  const remoteUsers = trpc.users.list.useQuery(undefined, {
+  const remotePeople = trpc.people.list.useQuery(undefined, {
     enabled: authenticated,
     retry: false,
   });
-  const people: Person[] = remoteUsers.data?.length
-    ? remoteUsers.data.map(user => ({
-        id: String(user.id),
-        name: user.name || user.email || "Usuário sem nome",
-        area: user.email || "Conta OAuth",
+  const updatePerson = trpc.people.update.useMutation({
+    onSuccess: () => remotePeople.refetch(),
+  });
+  const people: Person[] = remotePeople.data?.length
+    ? remotePeople.data.map(person => ({
+        id: String(person.id),
+        name: person.name,
+        area: person.area,
+        profileKey:
+          person.profile === "gestao" ||
+          person.profile === "coordenacao" ||
+          person.profile === "campo" ||
+          person.profile === "terceiro"
+            ? person.profile
+            : "campo",
         profile:
-          user.accessProfile === "cliente"
-            ? "Cliente"
-            : user.accessProfile === "terceiros"
-              ? "Terceiro"
-              : user.accessProfile === "campo"
-                ? "Equipe de campo"
-                : user.accessProfile === "pessoas"
-                  ? "Gestão de pessoas"
-                  : "Gestão Inovadoor",
-        last: user.lastSignedIn
-          ? new Date(user.lastSignedIn).toLocaleString("pt-BR")
+          person.profile === "gestao"
+            ? "Gestão Inovadoor"
+            : person.profile === "coordenacao"
+              ? "Coordenação"
+              : person.profile === "terceiro"
+                ? "Terceiro"
+                : "Equipe de campo",
+        last: person.lastAccessAt
+          ? new Date(person.lastAccessAt).toLocaleString("pt-BR")
           : "Ainda não acessou",
-        access: "Ativo",
+        access:
+          person.status === "ativo"
+            ? "Ativo"
+            : person.status === "inativo"
+              ? "Inativo"
+              : "Pendente",
       }))
     : store.people;
   return (
@@ -1898,9 +1913,31 @@ function PeoplePage({ store, onAdd }: { store: DemoStore; onAdd: () => void }) {
                     </div>
                   </td>
                   <td className="py-4">
-                    <p className="text-xs font-medium text-slate-600">
-                      {person.profile}
-                    </p>
+                    {authenticated && /^\d+$/.test(person.id) ? (
+                      <select
+                        value={person.profileKey ?? "campo"}
+                        onChange={event =>
+                          updatePerson.mutate({
+                            id: Number(person.id),
+                            profile: event.target.value as
+                              | "gestao"
+                              | "coordenacao"
+                              | "campo"
+                              | "terceiro",
+                          })
+                        }
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
+                      >
+                        <option value="gestao">Gestão Inovadoor</option>
+                        <option value="coordenacao">Coordenação</option>
+                        <option value="campo">Equipe de campo</option>
+                        <option value="terceiro">Terceiro</option>
+                      </select>
+                    ) : (
+                      <p className="text-xs font-medium text-slate-600">
+                        {person.profile}
+                      </p>
+                    )}
                     <p className="mt-0.5 text-[11px] text-slate-400">
                       {person.area}
                     </p>
@@ -1919,9 +1956,22 @@ function PeoplePage({ store, onAdd }: { store: DemoStore; onAdd: () => void }) {
                     </span>
                   </td>
                   <td className="py-4 pr-1 text-right">
-                    <button className="rounded-lg p-2 text-slate-300 hover:bg-slate-50 hover:text-orange-600">
-                      <Settings2 className="h-4 w-4" />
-                    </button>
+                    {authenticated && /^\d+$/.test(person.id) ? (
+                      <button
+                        onClick={() =>
+                          updatePerson.mutate({
+                            id: Number(person.id),
+                            status:
+                              person.access === "Ativo" ? "inativo" : "ativo",
+                          })
+                        }
+                        className="rounded-lg px-2 py-1 text-[11px] font-semibold text-orange-600 hover:bg-orange-50"
+                      >
+                        {person.access === "Ativo" ? "Desativar" : "Ativar"}
+                      </button>
+                    ) : (
+                      <Settings2 className="ml-auto h-4 w-4 text-slate-300" />
+                    )}
                   </td>
                 </tr>
               ))}
@@ -4048,12 +4098,25 @@ function LoginPanel({
   setRole,
   onEnter,
   onRealLogin,
+  error,
 }: {
   role: RoleKey;
   setRole: (role: RoleKey) => void;
-  onEnter: () => void;
+  onEnter: (credentials: { email: string; password: string }) => void;
   onRealLogin: () => void;
+  error?: string;
 }) {
+  const [email, setEmail] = useState(
+    role === "cliente" ? "manutencao@friosul.com.br" : "admin@inovadoor.com.br"
+  );
+  const [password, setPassword] = useState("Inovadoor@2026");
+  useEffect(() => {
+    setEmail(
+      role === "cliente"
+        ? "manutencao@friosul.com.br"
+        : "admin@inovadoor.com.br"
+    );
+  }, [role]);
   return (
     <div className="fixed inset-0 z-50 flex overflow-y-auto bg-[#081522]">
       <div className="hidden w-[46%] flex-col justify-between bg-[radial-gradient(circle_at_74%_25%,rgba(243,111,33,.26),transparent_34%),linear-gradient(145deg,#0b1e30,#07111d)] p-10 text-white lg:flex">
@@ -4165,11 +4228,8 @@ function LoginPanel({
                 E-mail de acesso
               </span>
               <input
-                defaultValue={
-                  role === "cliente"
-                    ? "manutencao@friosul.com.br"
-                    : "beatriz@inovadoor.com.br"
-                }
+                value={email}
+                onChange={event => setEmail(event.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
               />
             </label>
@@ -4179,17 +4239,28 @@ function LoginPanel({
               </span>
               <input
                 type="password"
-                defaultValue="inovadoor"
+                value={password}
+                onChange={event => setPassword(event.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
               />
             </label>
           </div>
           <button
-            onClick={onEnter}
+            onClick={() => onEnter({ email, password })}
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#f36f21] py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-500/20 transition hover:bg-[#dd5c12]"
           >
             Entrar na plataforma <ArrowUpRight className="h-4 w-4" />
           </button>
+          {error && (
+            <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-center text-[11px] font-semibold text-rose-700">
+              {error}
+            </p>
+          )}
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-center text-[11px] text-amber-800">
+            Acesso demonstrativo ADM: <strong>admin@inovadoor.com.br</strong> ·
+            senha <strong>Inovadoor@2026</strong>. Para produção, use o login
+            OAuth real.
+          </p>
           <button
             onClick={onRealLogin}
             className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 transition hover:border-orange-300 hover:text-orange-700"
@@ -4383,6 +4454,7 @@ function CreateModal({
     equipmentStandard: "Cadastrar equipamento padrão",
     equipmentInstall: "Instalar equipamento no cliente",
     thirdParty: "Cadastrar terceiro",
+    person: "Cadastrar pessoa e acesso",
     workOrder: "Criar ordem de serviço",
     ticket: "Abrir chamado",
     link: "Ajustar vínculo equipamento–cliente",
@@ -4960,6 +5032,68 @@ function CreateModal({
               />
             </>
           )}
+          {modal === "person" && (
+            <>
+              <div className="sm:col-span-2 rounded-xl border border-orange-100 bg-orange-50/70 p-3 text-xs leading-5 text-orange-800">
+                Defina o nível de acesso e o status. O acesso real usa Manus
+                OAuth; a credencial administrativa demonstrativa fica disponível
+                na tela inicial.
+              </div>
+              <InputField
+                label="Nome completo"
+                required
+                value={values.name ?? ""}
+                onChange={value => update("name", value)}
+                placeholder="Nome da pessoa"
+              />
+              <InputField
+                label="E-mail de acesso"
+                required
+                value={values.email ?? ""}
+                onChange={value => update("email", value)}
+                placeholder="pessoa@empresa.com.br"
+              />
+              <InputField
+                label="Telefone"
+                value={values.phone ?? ""}
+                onChange={value => update("phone", value)}
+                placeholder="(41) 99999-0000"
+              />
+              <InputField
+                label="Área"
+                value={values.area ?? ""}
+                onChange={value => update("area", value)}
+                placeholder="Operações, Engenharia, Financeiro..."
+              />
+              <SelectField
+                label="Nível de acesso"
+                value={values.profile ?? "campo"}
+                onChange={value => update("profile", value)}
+                options={[
+                  { value: "gestao", label: "Gestão Inovadoor — acesso total" },
+                  {
+                    value: "coordenacao",
+                    label: "Coordenação — agenda e operação",
+                  },
+                  {
+                    value: "campo",
+                    label: "Equipe de campo — PWA e OS atribuídas",
+                  },
+                  { value: "terceiro", label: "Terceiro — obras atribuídas" },
+                ]}
+              />
+              <SelectField
+                label="Status do acesso"
+                value={values.status ?? "pendente"}
+                onChange={value => update("status", value)}
+                options={[
+                  { value: "ativo", label: "Ativo" },
+                  { value: "pendente", label: "Pendente — convite não aceito" },
+                  { value: "inativo", label: "Inativo — bloquear acesso" },
+                ]}
+              />
+            </>
+          )}
           {modal === "form" && (
             <>
               <div className="sm:col-span-2">
@@ -5037,6 +5171,7 @@ function CreateModal({
             modal !== "equipmentInstall" &&
             modal !== "link" &&
             modal !== "thirdParty" &&
+            modal !== "person" &&
             modal !== "form" && (
               <div className="sm:col-span-2">
                 <InputField
@@ -5140,6 +5275,7 @@ export default function Home() {
   const auth = useAuth();
   const customerMutation = trpc.customers.create.useMutation();
   const thirdPartyMutation = trpc.thirdParties.create.useMutation();
+  const personMutation = trpc.people.create.useMutation();
   const ticketMutation = trpc.customerTickets.create.useMutation();
   const createFormMutation = trpc.forms.create.useMutation();
   const createCustomFormMutation = trpc.customForms.create.useMutation();
@@ -5161,6 +5297,7 @@ export default function Home() {
   const [activeRole, setActiveRole] = useState<RoleKey>("gestao");
   const [activeSection, setActiveSection] = useState<SectionKey>("visao");
   const [showLogin, setShowLogin] = useState(false);
+  const [loginError, setLoginError] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState<ModalKey>(null);
@@ -5592,6 +5729,69 @@ export default function Home() {
       }));
       setToast("Terceiro cadastrado para homologação.");
     }
+    if (modal === "person") {
+      if (!payload.name || !payload.email) {
+        setToast("Informe nome e e-mail para cadastrar a pessoa.");
+        return;
+      }
+      if (authenticated) {
+        try {
+          await personMutation.mutateAsync({
+            name: payload.name,
+            email: payload.email,
+            phone: payload.phone || undefined,
+            area: payload.area || undefined,
+            profile: (payload.profile || "campo") as
+              | "gestao"
+              | "coordenacao"
+              | "campo"
+              | "terceiro",
+            status: (payload.status || "pendente") as
+              | "ativo"
+              | "pendente"
+              | "inativo",
+          });
+          setToast(
+            "Pessoa cadastrada. O acesso será liberado conforme o status e o login OAuth."
+          );
+        } catch {
+          setToast(
+            "Não foi possível salvar a pessoa. Verifique sua permissão de Gestão."
+          );
+          return;
+        }
+      } else {
+        const profileLabel =
+          payload.profile === "gestao"
+            ? "Gestão Inovadoor"
+            : payload.profile === "coordenacao"
+              ? "Coordenação"
+              : payload.profile === "terceiro"
+                ? "Terceiro"
+                : "Equipe de campo";
+        setStore(current => ({
+          ...current,
+          people: [
+            {
+              id: makeId("person"),
+              name: payload.name,
+              area: payload.area || "Operações de campo",
+              profile: profileLabel,
+              profileKey: payload.profile as Person["profileKey"],
+              last: "Ainda não acessou",
+              access:
+                payload.status === "ativo"
+                  ? "Ativo"
+                  : payload.status === "inativo"
+                    ? "Inativo"
+                    : "Pendente",
+            },
+            ...current.people,
+          ],
+        }));
+        setToast("Pessoa adicionada ao modo demonstrativo.");
+      }
+    }
     if (modal === "workOrder") {
       const item: WorkOrder = {
         id: `OS-2026-${Math.floor(1000 + Math.random() * 8999)}`,
@@ -5815,9 +6015,22 @@ export default function Home() {
       <LoginPanel
         role={activeRole}
         setRole={setActiveRole}
+        error={loginError}
         onRealLogin={startLogin}
-        onEnter={() => {
+        onEnter={({ email, password }) => {
+          if (
+            activeRole === "gestao" &&
+            (email.trim().toLowerCase() !== "admin@inovadoor.com.br" ||
+              password !== "Inovadoor@2026")
+          ) {
+            setLoginError(
+              "Credenciais ADM inválidas. Use admin@inovadoor.com.br e a senha cadastrada."
+            );
+            return;
+          }
+          setLoginError("");
           setShowLogin(false);
+          window.sessionStorage.setItem("inovadoor-demo-auth", "admin");
           if (activeRole === "campo") return;
           if (activeRole === "cliente") return;
           setActiveSection(
@@ -5935,12 +6148,7 @@ export default function Home() {
           />
         );
       case "pessoas":
-        return (
-          <PeoplePage
-            store={store}
-            onAdd={() => setToast("Convite de pessoa preparado para envio.")}
-          />
-        );
+        return <PeoplePage store={store} onAdd={() => openModal("person")} />;
       case "terceiros":
         return (
           <ThirdPartiesPage
