@@ -4452,7 +4452,7 @@ function CreateModal({
     formId: store.forms[0]?.id ?? "",
     priority: "Média",
     category: "Atendimento",
-    status: "Homologado",
+    status: modal === "person" ? "ativo" : "Homologado",
     fields: "Fotos, assinatura, checklist",
     state: "Operacional",
     entityType: editingCustomForm?.entityType ?? "customer",
@@ -5459,6 +5459,7 @@ function FormPreview({
 
 export default function Home() {
   const auth = useAuth();
+  const trpcUtils = trpc.useUtils();
   const localLoginMutation = trpc.auth.localLogin.useMutation();
   const customerMutation = trpc.customers.create.useMutation();
   const thirdPartyMutation = trpc.thirdParties.create.useMutation();
@@ -5951,13 +5952,18 @@ export default function Home() {
               | "pendente"
               | "inativo",
           });
+          await trpcUtils.people.list.invalidate();
           setToast(
             "Pessoa cadastrada. O acesso usa o e-mail e a senha informados quando o status estiver ativo."
           );
-        } catch {
-          setToast(
-            "Não foi possível salvar a pessoa. Verifique sua permissão de Gestão."
-          );
+          setModal(null);
+          setEditingCustomForm(null);
+        } catch (error) {
+          const message =
+            error instanceof Error && error.message
+              ? error.message
+              : "erro desconhecido";
+          setToast(`Não foi possível salvar a pessoa: ${message}`);
           return;
         }
       } else {
