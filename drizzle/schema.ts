@@ -81,6 +81,8 @@ export const customers = mysqlTable("customers", {
   organizationId: int("organizationId").notNull(),
   name: varchar("name", { length: 180 }).notNull(),
   document: varchar("document", { length: 30 }),
+  contractNumber: varchar("contractNumber", { length: 60 }).unique(),
+  segmentId: int("segmentId"),
   city: varchar("city", { length: 100 }),
   state: varchar("state", { length: 2 }),
   address: text("address"),
@@ -91,12 +93,36 @@ export const customers = mysqlTable("customers", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const customerSegments = mysqlTable("customerSegments", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  active: int("active").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const customerContacts = mysqlTable("customerContacts", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  customerId: int("customerId").notNull(),
+  name: varchar("name", { length: 160 }).notNull(),
+  phone: varchar("phone", { length: 40 }),
+  email: varchar("email", { length: 320 }),
+  isPrimary: int("isPrimary").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const thirdParties = mysqlTable("thirdParties", {
   id: int("id").autoincrement().primaryKey(),
   organizationId: int("organizationId").notNull(),
   name: varchar("name", { length: 180 }).notNull(),
   document: varchar("document", { length: 30 }),
   region: varchar("region", { length: 100 }),
+  baseAddress: text("baseAddress"),
+  serviceRadiusKm: int("serviceRadiusKm").default(0).notNull(),
+  teamCount: int("teamCount").default(0).notNull(),
   contactName: varchar("contactName", { length: 160 }),
   contactEmail: varchar("contactEmail", { length: 320 }),
   status: mysqlEnum("status", ["homologado", "em_revisao", "bloqueado"])
@@ -107,11 +133,48 @@ export const thirdParties = mysqlTable("thirdParties", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const thirdPartyContacts = mysqlTable("thirdPartyContacts", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  thirdPartyId: int("thirdPartyId").notNull(),
+  name: varchar("name", { length: 160 }).notNull(),
+  phone: varchar("phone", { length: 40 }),
+  email: varchar("email", { length: 320 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const equipmentCategories = mysqlTable("equipmentCategories", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  active: int("active").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const equipmentManufacturers = mysqlTable("equipmentManufacturers", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  active: int("active").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const installationEnvironments = mysqlTable("installationEnvironments", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  name: varchar("name", { length: 160 }).notNull(),
+  description: text("description"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const equipmentCatalogs = mysqlTable("equipmentCatalogs", {
   id: int("id").autoincrement().primaryKey(),
   organizationId: int("organizationId").notNull(),
   code: varchar("code", { length: 80 }).notNull().unique(),
   name: varchar("name", { length: 180 }).notNull(),
+  categoryId: int("categoryId"),
+  manufacturerId: int("manufacturerId"),
   category: varchar("category", { length: 120 })
     .default("Porta industrial")
     .notNull(),
@@ -133,6 +196,7 @@ export const equipment = mysqlTable("equipment", {
   model: varchar("model", { length: 120 }),
   serialNumber: varchar("serialNumber", { length: 120 }),
   installationLocation: varchar("installationLocation", { length: 180 }),
+  environmentId: int("environmentId"),
   state: mysqlEnum("state", ["operacional", "manutencao", "atencao", "baixado"])
     .default("operacional")
     .notNull(),

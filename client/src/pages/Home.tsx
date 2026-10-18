@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { trpc } from "@/lib/trpc";
+import { startLogin } from "@/const";
+import { useAuth } from "@/_core/hooks/useAuth";
 import {
   Activity,
   ArrowDownRight,
@@ -79,6 +81,20 @@ type ModalKey =
   | "customForm"
   | null;
 
+type CustomerContact = {
+  name: string;
+  phone: string;
+  email: string;
+  isPrimary?: boolean;
+};
+type CustomerSegment = { id: string; name: string };
+type EquipmentCategory = { id: string; name: string };
+type EquipmentManufacturer = { id: string; name: string };
+type InstallationEnvironment = {
+  id: string;
+  name: string;
+  description?: string;
+};
 type Customer = {
   id: string;
   name: string;
@@ -86,6 +102,9 @@ type Customer = {
   state: string;
   address: string;
   contact: string;
+  contractNumber?: string;
+  segmentId?: string;
+  contacts?: CustomerContact[];
   assets: number;
   open: number;
 };
@@ -98,14 +117,20 @@ type Equipment = {
   standardId?: string;
   serialNumber?: string;
   installationLocation?: string;
+  environmentId?: string;
   state: "Operacional" | "Manutenção" | "Atenção";
   lastMaintenance: string;
 };
+type ThirdPartyContact = { name: string; phone: string; email: string };
 type ThirdParty = {
   id: string;
   name: string;
   region: string;
   contact: string;
+  baseAddress?: string;
+  serviceRadiusKm?: number;
+  teamCount?: number;
+  contacts?: ThirdPartyContact[];
   open: number;
   sla: number;
   status: "Homologado" | "Em revisão" | "Bloqueado";
@@ -147,7 +172,9 @@ type EquipmentStandard = {
   code: string;
   name: string;
   category: string;
+  categoryId?: string;
   manufacturer: string;
+  manufacturerId?: string;
   model: string;
   description: string;
 };
@@ -202,6 +229,10 @@ type DemoStore = {
   customers: Customer[];
   equipmentStandards: EquipmentStandard[];
   customForms: CustomFormDefinition[];
+  customerSegments: CustomerSegment[];
+  equipmentCategories: EquipmentCategory[];
+  equipmentManufacturers: EquipmentManufacturer[];
+  installationEnvironments: InstallationEnvironment[];
   equipment: Equipment[];
   thirdParties: ThirdParty[];
   people: Person[];
@@ -297,6 +328,16 @@ const seedStore: DemoStore = {
       state: "PR",
       address: "Rua Joinville, 1840",
       contact: "Patrícia Gomes · (41) 99921-4410",
+      contractNumber: "CTR-2026-00001",
+      segmentId: "seg-logistica",
+      contacts: [
+        {
+          name: "Patrícia Gomes",
+          phone: "(41) 99921-4410",
+          email: "patricia@friosul.example",
+          isPrimary: true,
+        },
+      ],
       assets: 12,
       open: 2,
     },
@@ -331,13 +372,40 @@ const seedStore: DemoStore = {
       open: 0,
     },
   ],
+  customerSegments: [
+    { id: "seg-alimentos", name: "Alimentos" },
+    { id: "seg-logistica", name: "Logística" },
+    { id: "seg-industria", name: "Indústria" },
+    { id: "seg-varejo", name: "Varejo" },
+  ],
+  equipmentCategories: [
+    { id: "cat-porta", name: "Porta industrial" },
+    { id: "cat-doca", name: "Doca" },
+    { id: "cat-seguranca", name: "Segurança e controle" },
+  ],
+  equipmentManufacturers: [
+    { id: "man-inovadoor", name: "Inovadoor" },
+    { id: "man-bluespeed", name: "Blue Speed" },
+  ],
+  installationEnvironments: [
+    { id: "env-doca", name: "Doca", description: "Área de carga e descarga" },
+    { id: "env-expedicao", name: "Expedição", description: "Fluxo de saída" },
+    {
+      id: "env-camara",
+      name: "Câmara fria",
+      description: "Ambiente refrigerado",
+    },
+    { id: "env-producao", name: "Produção", description: "Área produtiva" },
+  ],
   equipmentStandards: [
     {
       id: "std-porta-rapida",
       code: "PAD-PORTA-RAPIDA",
       name: "Porta rápida",
       category: "Porta industrial",
+      categoryId: "cat-porta",
       manufacturer: "Inovadoor",
+      manufacturerId: "man-inovadoor",
       model: "Inova Speed 400",
       description: "Porta rápida para alto fluxo de docas e áreas industriais.",
     },
@@ -346,7 +414,9 @@ const seedStore: DemoStore = {
       code: "PAD-PORTA-SECCIONAL",
       name: "Porta seccional",
       category: "Porta industrial",
+      categoryId: "cat-porta",
       manufacturer: "Inovadoor",
+      manufacturerId: "man-inovadoor",
       model: "Inova Seccional",
       description: "Porta seccional para fechamento e isolamento de galpões.",
     },
@@ -489,6 +559,16 @@ const seedStore: DemoStore = {
       name: "Updoors Assistência",
       region: "Sul",
       contact: "Eduardo Martins",
+      baseAddress: "Rua das Oficinas, 120 · Curitiba/PR",
+      serviceRadiusKm: 180,
+      teamCount: 4,
+      contacts: [
+        {
+          name: "Eduardo Martins",
+          phone: "(41) 99111-2200",
+          email: "eduardo@updoors.example",
+        },
+      ],
       open: 7,
       sla: 94,
       status: "Homologado",
@@ -1293,12 +1373,24 @@ function CustomersPage({
             <h3 className="mt-4 text-sm font-bold text-slate-800">
               {customer.name}
             </h3>
+            <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] font-semibold">
+              <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">
+                {customer.contractNumber || "Contrato pendente"}
+              </span>
+              <span className="rounded-full bg-slate-50 px-2 py-1 text-slate-600">
+                {store.customerSegments.find(
+                  item => item.id === customer.segmentId
+                )?.name || "Segmento não informado"}
+              </span>
+            </div>
             <p className="mt-1 flex items-center gap-1 text-xs text-slate-400">
               <MapPin className="h-3 w-3" />
               {customer.city} · {customer.state}
             </p>
             <p className="mt-3 truncate text-[11px] text-slate-500">
-              {customer.contact}
+              {customer.contacts?.[0]
+                ? `${customer.contacts[0].name} · ${customer.contacts[0].phone || customer.contacts[0].email || "Contato cadastrado"}`
+                : customer.contact}
             </p>
             <div className="mt-5 grid grid-cols-2 gap-2 border-t border-slate-100 pt-4">
               <div>
@@ -1582,7 +1674,7 @@ function ThirdPartiesPage({
       <SectionHeading
         eyebrow="Rede autorizada"
         title="Terceiros e fornecedores"
-        description="Homologue parceiros, distribua OS e acompanhe cumprimento de SLA."
+        description="Homologue parceiros, distribua OS e acompanhe cobertura, base e equipes."
         action={
           <button
             onClick={onAdd}
@@ -1640,8 +1732,8 @@ function ThirdPartiesPage({
                 <th className="pb-3 pl-1 font-semibold">Empresa</th>
                 <th className="pb-3 font-semibold">Região</th>
                 <th className="pb-3 font-semibold">Responsável</th>
-                <th className="pb-3 font-semibold">OS abertas</th>
-                <th className="pb-3 font-semibold">SLA 30 dias</th>
+                <th className="pb-3 font-semibold">Base / raio</th>
+                <th className="pb-3 font-semibold">Equipes</th>
                 <th className="pb-3 font-semibold">Status</th>
               </tr>
             </thead>
@@ -1660,13 +1752,21 @@ function ThirdPartiesPage({
                     {partner.region}
                   </td>
                   <td className="py-4 text-xs text-slate-600">
-                    {partner.contact}
+                    {partner.contacts?.[0]?.name || partner.contact}
+                    <span className="block text-[10px] text-slate-400">
+                      {partner.contacts?.[0]?.phone || "Telefone não informado"}
+                    </span>
+                  </td>
+                  <td className="py-4 text-xs text-slate-600">
+                    <span className="block max-w-[190px] truncate">
+                      {partner.baseAddress || "Base não informada"}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      Raio {partner.serviceRadiusKm || 0} km
+                    </span>
                   </td>
                   <td className="py-4 text-xs font-semibold text-slate-700">
-                    {partner.open}
-                  </td>
-                  <td className="py-4 text-xs font-semibold text-emerald-700">
-                    {partner.sla}%
+                    {partner.teamCount || 0}
                   </td>
                   <td className="py-4">
                     <span
@@ -1693,6 +1793,34 @@ function ThirdPartiesPage({
 }
 
 function PeoplePage({ store, onAdd }: { store: DemoStore; onAdd: () => void }) {
+  const authenticated =
+    typeof window !== "undefined" &&
+    Boolean(window.sessionStorage.getItem("manus-cookie"));
+  const remoteUsers = trpc.users.list.useQuery(undefined, {
+    enabled: authenticated,
+    retry: false,
+  });
+  const people: Person[] = remoteUsers.data?.length
+    ? remoteUsers.data.map(user => ({
+        id: String(user.id),
+        name: user.name || user.email || "Usuário sem nome",
+        area: user.email || "Conta OAuth",
+        profile:
+          user.accessProfile === "cliente"
+            ? "Cliente"
+            : user.accessProfile === "terceiros"
+              ? "Terceiro"
+              : user.accessProfile === "campo"
+                ? "Equipe de campo"
+                : user.accessProfile === "pessoas"
+                  ? "Gestão de pessoas"
+                  : "Gestão Inovadoor",
+        last: user.lastSignedIn
+          ? new Date(user.lastSignedIn).toLocaleString("pt-BR")
+          : "Ainda não acessou",
+        access: "Ativo",
+      }))
+    : store.people;
   return (
     <>
       <SectionHeading
@@ -1712,14 +1840,14 @@ function PeoplePage({ store, onAdd }: { store: DemoStore; onAdd: () => void }) {
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Pessoas cadastradas"
-          value={String(store.people.length)}
+          value={String(people.length)}
           detail="22 em campo"
           icon={UsersRound}
           tone="bg-blue-50 text-blue-700"
         />
         <StatCard
           label="Acessos ativos"
-          value={String(store.people.filter(p => p.access === "Ativo").length)}
+          value={String(people.filter(p => p.access === "Ativo").length)}
           detail="Convites controlados por perfil"
           icon={ShieldCheck}
           tone="bg-emerald-50 text-emerald-700"
@@ -1754,7 +1882,7 @@ function PeoplePage({ store, onAdd }: { store: DemoStore; onAdd: () => void }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {store.people.map(person => (
+              {people.map(person => (
                 <tr key={person.id} className="text-sm">
                   <td className="py-4 pl-1">
                     <div className="flex items-center gap-3">
@@ -2917,6 +3045,10 @@ function OperationsDashboard({
   const convertMutation =
     trpc.integrations.operations.convertTechnicalRequest.useMutation();
   const [notice, setNotice] = useState("");
+  const [selectedItem, setSelectedItem] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const demoPlans = [
     {
       id: -1,
@@ -3050,7 +3182,7 @@ function OperationsDashboard({
                 <button
                   className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600"
                   onClick={() =>
-                    setNotice("Detalhes operacionais preparados para abertura.")
+                    setSelectedItem(item as unknown as Record<string, unknown>)
                   }
                 >
                   Abrir detalhes
@@ -3060,6 +3192,96 @@ function OperationsDashboard({
           );
         })}
       </div>
+      {selectedItem && (
+        <div className="rounded-2xl border border-orange-100 bg-orange-50/70 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-700">
+                Ficha operacional
+              </p>
+              <h2 className="mt-1 text-lg font-bold text-slate-900">
+                {String(selectedItem.title || "Registro operacional")}
+              </h2>
+              <p className="mt-1 text-xs text-slate-600">
+                {String(selectedItem.customerName || "Cliente não informado")} ·{" "}
+                {String(selectedItem.location || "Local não informado")}
+              </p>
+            </div>
+            <button
+              onClick={() => setSelectedItem(null)}
+              className="rounded-lg p-2 text-slate-500 hover:bg-white"
+              aria-label="Fechar detalhes"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-4">
+            <div className="rounded-xl bg-white p-3">
+              <p className="text-[10px] text-slate-400">Status</p>
+              <p className="mt-1 text-xs font-bold text-slate-700">
+                {String(selectedItem.status || "—")}
+              </p>
+            </div>
+            <div className="rounded-xl bg-white p-3">
+              <p className="text-[10px] text-slate-400">monday</p>
+              <p className="mt-1 text-xs font-bold text-slate-700">
+                {String(selectedItem.mondayStatus || "—")}
+              </p>
+            </div>
+            <div className="rounded-xl bg-white p-3">
+              <p className="text-[10px] text-slate-400">Prioridade</p>
+              <p className="mt-1 text-xs font-bold text-slate-700">
+                {String(selectedItem.priority || "Planejada")}
+              </p>
+            </div>
+            <div className="rounded-xl bg-white p-3">
+              <p className="text-[10px] text-slate-400">Próxima ação</p>
+              <p className="mt-1 text-xs font-bold text-slate-700">
+                {isInstallation
+                  ? role === "campo"
+                    ? "Aceitar obra"
+                    : "Escolher instalador"
+                  : role === "gestao"
+                    ? "Converter em OS"
+                    : "Acompanhar"}
+              </p>
+            </div>
+          </div>
+          {isInstallation && (
+            <div className="mt-4 rounded-xl border border-orange-100 bg-white p-4">
+              <p className="text-xs font-bold text-slate-800">
+                Candidatos e regra de aceite
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                A obra pode ser visualizada por vários instaladores enquanto
+                estiver disponível. Depois do aceite, ela fica visível apenas
+                para a Gestão e para o instalador escolhido, com OS vinculada.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold text-slate-600">
+                {[
+                  "Marcos Lima · Equipe A",
+                  "Camila Rocha · Equipe B",
+                  "Rafael Alves · Parceiro",
+                ].map(candidate => (
+                  <span
+                    key={candidate}
+                    className="rounded-full bg-slate-100 px-2.5 py-1"
+                  >
+                    {candidate}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {!isInstallation && (
+            <div className="mt-4 rounded-xl border border-blue-100 bg-white p-4 text-xs leading-5 text-slate-600">
+              O chamado está na fila de triagem. A Gestão pode confirmar
+              equipamento, prioridade, equipe responsável e converter esta
+              solicitação em uma OS rastreável.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -3825,10 +4047,12 @@ function LoginPanel({
   role,
   setRole,
   onEnter,
+  onRealLogin,
 }: {
   role: RoleKey;
   setRole: (role: RoleKey) => void;
   onEnter: () => void;
+  onRealLogin: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex overflow-y-auto bg-[#081522]">
@@ -3898,40 +4122,42 @@ function LoginPanel({
             </p>
           </div>
           <div className="grid gap-2.5">
-            {roles.map(item => (
-              <button
-                key={item.key}
-                onClick={() => setRole(item.key)}
-                className={cx(
-                  "flex items-center gap-3 rounded-2xl border p-3.5 text-left transition",
-                  role === item.key
-                    ? "border-orange-300 bg-orange-50/70 ring-2 ring-orange-100"
-                    : "border-slate-200 bg-white hover:border-slate-300"
-                )}
-              >
-                <span
+            {roles
+              .filter(item => item.key !== "pessoas")
+              .map(item => (
+                <button
+                  key={item.key}
+                  onClick={() => setRole(item.key)}
                   className={cx(
-                    "flex h-9 w-9 items-center justify-center rounded-xl",
+                    "flex items-center gap-3 rounded-2xl border p-3.5 text-left transition",
                     role === item.key
-                      ? "bg-orange-500 text-white"
-                      : "bg-slate-100 text-slate-500"
+                      ? "border-orange-300 bg-orange-50/70 ring-2 ring-orange-100"
+                      : "border-slate-200 bg-white hover:border-slate-300"
                   )}
                 >
-                  <item.icon className="h-4 w-4" />
-                </span>
-                <span className="flex-1">
-                  <span className="block text-sm font-bold text-slate-800">
-                    {item.label}
+                  <span
+                    className={cx(
+                      "flex h-9 w-9 items-center justify-center rounded-xl",
+                      role === item.key
+                        ? "bg-orange-500 text-white"
+                        : "bg-slate-100 text-slate-500"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
                   </span>
-                  <span className="mt-0.5 block text-xs text-slate-400">
-                    {item.description}
+                  <span className="flex-1">
+                    <span className="block text-sm font-bold text-slate-800">
+                      {item.label}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-400">
+                      {item.description}
+                    </span>
                   </span>
-                </span>
-                {role === item.key && (
-                  <CheckCircle2 className="h-4 w-4 text-orange-600" />
-                )}
-              </button>
-            ))}
+                  {role === item.key && (
+                    <CheckCircle2 className="h-4 w-4 text-orange-600" />
+                  )}
+                </button>
+              ))}
           </div>
           <div className="mt-6 space-y-3">
             <label className="block">
@@ -3964,9 +4190,15 @@ function LoginPanel({
           >
             Entrar na plataforma <ArrowUpRight className="h-4 w-4" />
           </button>
+          <button
+            onClick={onRealLogin}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 transition hover:border-orange-300 hover:text-orange-700"
+          >
+            Entrar com minha conta real
+          </button>
           <p className="mt-5 text-center text-xs text-slate-400">
-            Ambiente de validação do fluxo · permissões prontas para
-            autenticação real
+            O seletor acima é apenas para demonstração. No acesso real, o perfil
+            vem da conta autenticada e da permissão atribuída pela Gestão.
           </p>
         </div>
       </div>
@@ -4113,6 +4345,10 @@ function CreateModal({
     equipmentId: store.equipment[0]?.id ?? "",
     standardId: store.equipmentStandards[0]?.id ?? "",
     thirdPartyId: store.thirdParties[0]?.id ?? "",
+    segmentId: store.customerSegments[0]?.id ?? "",
+    categoryId: store.equipmentCategories[0]?.id ?? "",
+    manufacturerId: store.equipmentManufacturers[0]?.id ?? "",
+    environmentId: store.installationEnvironments[0]?.id ?? "",
     formId: store.forms[0]?.id ?? "",
     priority: "Média",
     category: "Atendimento",
@@ -4123,6 +4359,9 @@ function CreateModal({
     fieldType: "text",
     required: "Não",
     fieldOptions: "",
+    fieldKey: "",
+    fieldLabel: "",
+    fieldPreset: "",
     ...(editingCustomForm
       ? {
           editId: editingCustomForm.id,
@@ -4185,13 +4424,10 @@ function CreateModal({
           />
           {modal === "customForm" && (
             <>
-              <div className="sm:col-span-2">
-                <div className="rounded-xl bg-orange-50 p-3 text-xs leading-5 text-orange-800">
-                  Crie um formulário para qualquer cadastro. Separe os campos
-                  por ponto e vírgula no formato{" "}
-                  <strong>chave|rótulo|tipo|obrigatório|opções</strong>. Ex.:
-                  garantia|Prazo de garantia|select|sim|12 meses,24 meses
-                </div>
+              <div className="sm:col-span-2 rounded-xl bg-orange-50 p-3 text-xs leading-5 text-orange-800">
+                Selecione um campo previamente conhecido ou crie um campo
+                básico. O sistema grava tipo, obrigatoriedade e opções sem
+                exigir código.
               </div>
               <div className="sm:col-span-2">
                 <InputField
@@ -4225,14 +4461,165 @@ function CreateModal({
                 onChange={value => update("description", value)}
                 placeholder="Quando usar este formulário"
               />
-              <div className="sm:col-span-2">
-                <InputField
-                  label="Campos customizados"
-                  required
-                  value={values.customFields ?? ""}
-                  onChange={value => update("customFields", value)}
-                  placeholder="garantia|Prazo|select|sim|12 meses,24 meses; observacao|Observação|textarea|não|"
-                />
+              <div className="sm:col-span-2 rounded-xl border border-slate-200 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  Campos do formulário
+                </p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <SelectField
+                    label="Campo predefinido"
+                    value={values.fieldPreset ?? ""}
+                    onChange={value => {
+                      update("fieldPreset", value);
+                      const presets: Record<string, [string, string, string]> =
+                        {
+                          segmento: [
+                            "segmento",
+                            "Segmento do cliente",
+                            "select",
+                          ],
+                          categoria: [
+                            "categoria",
+                            "Categoria do equipamento",
+                            "select",
+                          ],
+                          fabricante: ["fabricante", "Fabricante", "select"],
+                          ambiente: [
+                            "ambiente",
+                            "Ambiente de instalação",
+                            "select",
+                          ],
+                          contrato: ["contrato", "Número do contrato", "text"],
+                          serie: ["serie", "Número de série", "text"],
+                          checklist: [
+                            "checklist",
+                            "Checklist concluído",
+                            "checkbox",
+                          ],
+                          observacao: [
+                            "observacao",
+                            "Observação técnica",
+                            "textarea",
+                          ],
+                          data: ["data", "Data de execução", "date"],
+                        };
+                      const preset = presets[value];
+                      if (preset) {
+                        update("fieldKey", preset[0]);
+                        update("fieldLabel", preset[1]);
+                        update("fieldType", preset[2]);
+                        if (value === "segmento")
+                          update(
+                            "fieldOptions",
+                            store.customerSegments
+                              .map(item => item.name)
+                              .join(",")
+                          );
+                        if (value === "categoria")
+                          update(
+                            "fieldOptions",
+                            store.equipmentCategories
+                              .map(item => item.name)
+                              .join(",")
+                          );
+                        if (value === "fabricante")
+                          update(
+                            "fieldOptions",
+                            store.equipmentManufacturers
+                              .map(item => item.name)
+                              .join(",")
+                          );
+                        if (value === "ambiente")
+                          update(
+                            "fieldOptions",
+                            store.installationEnvironments
+                              .map(item => item.name)
+                              .join(",")
+                          );
+                      }
+                    }}
+                    options={[
+                      { value: "segmento", label: "Segmento do cliente" },
+                      { value: "categoria", label: "Categoria do equipamento" },
+                      { value: "fabricante", label: "Fabricante" },
+                      { value: "ambiente", label: "Ambiente de instalação" },
+                      { value: "contrato", label: "Número do contrato" },
+                      { value: "serie", label: "Número de série" },
+                      { value: "checklist", label: "Checklist concluído" },
+                      { value: "observacao", label: "Observação técnica" },
+                      { value: "data", label: "Data de execução" },
+                    ]}
+                  />
+                  <InputField
+                    label="Rótulo do campo"
+                    value={values.fieldLabel ?? ""}
+                    onChange={value => update("fieldLabel", value)}
+                    placeholder="Ex.: Temperatura medida"
+                  />
+                  <SelectField
+                    label="Tipo de dado"
+                    value={values.fieldType ?? "text"}
+                    onChange={value => update("fieldType", value)}
+                    options={[
+                      ["text", "Texto curto"],
+                      ["textarea", "Texto longo"],
+                      ["number", "Número"],
+                      ["date", "Data"],
+                      ["select", "Lista de opções"],
+                      ["checkbox", "Sim / não"],
+                    ].map(([value, label]) => ({ value, label }))}
+                  />
+                  <SelectField
+                    label="Obrigatório?"
+                    value={values.required ?? "Não"}
+                    onChange={value => update("required", value)}
+                    options={["Não", "Sim"].map(value => ({
+                      value,
+                      label: value,
+                    }))}
+                  />
+                  <InputField
+                    label="Opções da lista (opcional)"
+                    value={values.fieldOptions ?? ""}
+                    onChange={value => update("fieldOptions", value)}
+                    placeholder="Separe por vírgula"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const label = values.fieldLabel?.trim();
+                      if (!label) return;
+                      const key =
+                        values.fieldKey?.trim() ||
+                        label.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+                      const row = `${key}|${label}|${values.fieldType || "text"}|${values.required === "Sim" ? "sim" : "não"}|${values.fieldOptions || ""}`;
+                      update(
+                        "customFields",
+                        [values.customFields, row].filter(Boolean).join(";")
+                      );
+                      update("fieldKey", "");
+                      update("fieldLabel", "");
+                      update("fieldPreset", "");
+                      update("fieldOptions", "");
+                    }}
+                    className="self-end rounded-xl bg-[#0d1d2e] px-3 py-2.5 text-xs font-bold text-white"
+                  >
+                    Adicionar campo
+                  </button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {(values.customFields || "")
+                    .split(";")
+                    .filter(Boolean)
+                    .map(row => (
+                      <span
+                        key={row}
+                        className="rounded-lg bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600"
+                      >
+                        {row.split("|")[1] || row.split("|")[0]}
+                      </span>
+                    ))}
+                </div>
               </div>
             </>
           )}
@@ -4247,18 +4634,76 @@ function CreateModal({
                   placeholder="Ex.: Novo cliente industrial"
                 />
               </div>
-              <InputField
-                label="Cidade"
-                required
-                value={values.city ?? ""}
-                onChange={value => update("city", value)}
-                placeholder="Curitiba"
+              <SelectField
+                label="Segmento do cliente"
+                value={values.segmentId ?? ""}
+                onChange={value => update("segmentId", value)}
+                options={store.customerSegments.map(segment => ({
+                  value: segment.id,
+                  label: segment.name,
+                }))}
               />
               <InputField
+                label="Número do contrato"
+                value={values.contractNumber ?? ""}
+                onChange={value => update("contractNumber", value)}
+                placeholder="Deixe vazio para gerar CTR-ano-sequência"
+              />
+              <SelectField
+                label="Cidade"
+                value={values.city ?? "Curitiba"}
+                onChange={value => update("city", value)}
+                options={[
+                  "São Paulo",
+                  "Rio de Janeiro",
+                  "Curitiba",
+                  "Belo Horizonte",
+                  "Porto Alegre",
+                  "Salvador",
+                  "Recife",
+                  "Fortaleza",
+                  "Brasília",
+                  "Goiânia",
+                  "Joinville",
+                  "São José dos Pinhais",
+                  "Araucária",
+                  "Pinhais",
+                  "Outra cidade (informar no endereço)",
+                ].map(city => ({ value: city, label: city }))}
+              />
+              <SelectField
                 label="Estado"
                 value={values.state ?? "PR"}
                 onChange={value => update("state", value)}
-                placeholder="PR"
+                options={[
+                  "AC",
+                  "AL",
+                  "AP",
+                  "AM",
+                  "BA",
+                  "CE",
+                  "DF",
+                  "ES",
+                  "GO",
+                  "MA",
+                  "MT",
+                  "MS",
+                  "MG",
+                  "PA",
+                  "PB",
+                  "PR",
+                  "PE",
+                  "PI",
+                  "RJ",
+                  "RN",
+                  "RS",
+                  "RO",
+                  "RR",
+                  "SC",
+                  "SP",
+                  "SE",
+                  "TO",
+                ].map(state => ({ value: state, label: state }))}
               />
               <div className="sm:col-span-2">
                 <InputField
@@ -4268,12 +4713,37 @@ function CreateModal({
                   placeholder="Rua, número e complemento"
                 />
               </div>
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-2 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  Contato principal
+                </p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <InputField
+                    label="Nome"
+                    required
+                    value={values.contactName ?? ""}
+                    onChange={value => update("contactName", value)}
+                    placeholder="Nome do contato"
+                  />
+                  <InputField
+                    label="Telefone"
+                    value={values.contactPhone ?? ""}
+                    onChange={value => update("contactPhone", value)}
+                    placeholder="(41) 99999-0000"
+                  />
+                  <InputField
+                    label="E-mail"
+                    value={values.contactEmail ?? ""}
+                    onChange={value => update("contactEmail", value)}
+                    placeholder="contato@empresa.com.br"
+                  />
+                </div>
+              </div>
+              <div className="hidden">
                 <InputField
-                  label="Contato principal"
+                  label="Contato legado"
                   value={values.contact ?? ""}
                   onChange={value => update("contact", value)}
-                  placeholder="Nome · telefone · e-mail"
                 />
               </div>
             </>
@@ -4294,17 +4764,23 @@ function CreateModal({
                 onChange={value => update("name", value)}
                 placeholder="Porta rápida"
               />
-              <InputField
+              <SelectField
                 label="Categoria"
-                value={values.category ?? "Porta industrial"}
-                onChange={value => update("category", value)}
-                placeholder="Porta industrial"
+                value={values.categoryId ?? ""}
+                onChange={value => update("categoryId", value)}
+                options={store.equipmentCategories.map(category => ({
+                  value: category.id,
+                  label: category.name,
+                }))}
               />
-              <InputField
+              <SelectField
                 label="Fabricante"
-                value={values.manufacturer ?? "Inovadoor"}
-                onChange={value => update("manufacturer", value)}
-                placeholder="Inovadoor"
+                value={values.manufacturerId ?? ""}
+                onChange={value => update("manufacturerId", value)}
+                options={store.equipmentManufacturers.map(manufacturer => ({
+                  value: manufacturer.id,
+                  label: manufacturer.name,
+                }))}
               />
               <InputField
                 label="Modelo"
@@ -4359,6 +4835,15 @@ function CreateModal({
                 value={values.installationLocation ?? ""}
                 onChange={value => update("installationLocation", value)}
                 placeholder="Doca 05 · Galpão A"
+              />
+              <SelectField
+                label="Ambiente de instalação"
+                value={values.environmentId ?? ""}
+                onChange={value => update("environmentId", value)}
+                options={store.installationEnvironments.map(environment => ({
+                  value: environment.id,
+                  label: environment.name,
+                }))}
               />
             </>
           )}
@@ -4418,10 +4903,60 @@ function CreateModal({
                 placeholder="Sul"
               />
               <InputField
-                label="Responsável"
-                value={values.contact ?? ""}
-                onChange={value => update("contact", value)}
-                placeholder="Nome do contato"
+                label="Raio de atendimento (km)"
+                value={values.serviceRadiusKm ?? "0"}
+                onChange={value => update("serviceRadiusKm", value)}
+                placeholder="180"
+              />
+              <InputField
+                label="Quantidade de equipes"
+                value={values.teamCount ?? "0"}
+                onChange={value => update("teamCount", value)}
+                placeholder="4"
+              />
+              <div className="sm:col-span-2">
+                <InputField
+                  label="Endereço da base"
+                  value={values.baseAddress ?? ""}
+                  onChange={value => update("baseAddress", value)}
+                  placeholder="Rua, número, bairro, cidade/UF"
+                />
+              </div>
+              <div className="sm:col-span-2 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  Contato principal
+                </p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <InputField
+                    label="Nome"
+                    value={values.contactName ?? ""}
+                    onChange={value => update("contactName", value)}
+                    placeholder="Responsável"
+                  />
+                  <InputField
+                    label="Telefone"
+                    value={values.contactPhone ?? ""}
+                    onChange={value => update("contactPhone", value)}
+                    placeholder="(41) 99999-0000"
+                  />
+                  <InputField
+                    label="E-mail"
+                    value={values.contactEmail ?? ""}
+                    onChange={value => update("contactEmail", value)}
+                    placeholder="contato@parceiro.com.br"
+                  />
+                </div>
+              </div>
+              <SelectField
+                label="Status de homologação"
+                value={values.status ?? "Em revisão"}
+                onChange={value => update("status", value)}
+                options={["Homologado", "Em revisão", "Bloqueado"].map(
+                  value => ({
+                    value,
+                    label: value,
+                  })
+                )}
               />
             </>
           )}
@@ -4457,6 +4992,41 @@ function CreateModal({
                   value={values.description ?? ""}
                   onChange={value => update("description", value)}
                   placeholder="Explique quando usar este template"
+                />
+              </div>
+            </>
+          )}
+          {modal === "ticket" && (
+            <>
+              <div className="sm:col-span-2">
+                <SelectField
+                  label="Equipamento afetado"
+                  value={values.equipmentId ?? ""}
+                  onChange={value => update("equipmentId", value)}
+                  options={store.equipment
+                    .filter(item => item.customerId === store.customers[0]?.id)
+                    .map(item => ({
+                      value: item.id,
+                      label: `${item.name} · ${item.serialNumber || item.code}`,
+                    }))}
+                />
+              </div>
+              <SelectField
+                label="Prioridade"
+                value={values.priority ?? "Média"}
+                onChange={value => update("priority", value)}
+                options={["Baixa", "Média", "Alta"].map(value => ({
+                  value,
+                  label: value,
+                }))}
+              />
+              <div className="sm:col-span-2">
+                <InputField
+                  label="Descrição do problema"
+                  required
+                  value={values.description ?? ""}
+                  onChange={value => update("description", value)}
+                  placeholder="Explique o que aconteceu, quando começou e se há risco operacional"
                 />
               </div>
             </>
@@ -4567,6 +5137,10 @@ function FormPreview({
 }
 
 export default function Home() {
+  const auth = useAuth();
+  const customerMutation = trpc.customers.create.useMutation();
+  const thirdPartyMutation = trpc.thirdParties.create.useMutation();
+  const ticketMutation = trpc.customerTickets.create.useMutation();
   const createFormMutation = trpc.forms.create.useMutation();
   const createCustomFormMutation = trpc.customForms.create.useMutation();
   const updateCustomFormMutation = trpc.customForms.update.useMutation();
@@ -4594,6 +5168,10 @@ export default function Home() {
     useState<CustomFormDefinition | null>(null);
   const [previewForm, setPreviewForm] = useState<ServiceForm | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  useEffect(() => {
+    const profile = auth.user?.accessProfile;
+    if (profile) setActiveRole(profile as RoleKey);
+  }, [auth.user?.accessProfile]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([
     {
       id: "n-1",
@@ -4750,13 +5328,57 @@ export default function Home() {
   const saveModal = async (payload: Record<string, string>) => {
     const now = "31 ago 2026";
     if (modal === "customer") {
+      let customerId = makeId("cli");
+      if (authenticated) {
+        try {
+          const created = await customerMutation.mutateAsync({
+            name: payload.name || "Novo cliente",
+            contractNumber: payload.contractNumber || undefined,
+            segmentId: /^\d+$/.test(payload.segmentId || "")
+              ? Number(payload.segmentId)
+              : undefined,
+            city: payload.city || "Curitiba",
+            state: payload.state || "PR",
+            address: payload.address || undefined,
+            contactName: payload.contactName || undefined,
+            contactPhone: payload.contactPhone || undefined,
+            contactEmail: payload.contactEmail || undefined,
+            contacts: payload.contactName
+              ? [
+                  {
+                    name: payload.contactName,
+                    phone: payload.contactPhone || undefined,
+                    email: payload.contactEmail || undefined,
+                    isPrimary: true,
+                  },
+                ]
+              : undefined,
+          });
+          customerId = String(created?.id ?? customerId);
+        } catch {
+          // O fallback local mantém o teste disponível mesmo sem sessão.
+        }
+      }
       const item: Customer = {
-        id: makeId("cli"),
+        id: customerId,
         name: payload.name || "Novo cliente",
         city: payload.city || "Curitiba",
         state: payload.state || "PR",
         address: payload.address || "Endereço pendente",
-        contact: payload.contact || "Contato pendente",
+        contact: payload.contactName || payload.contact || "Contato pendente",
+        contractNumber:
+          payload.contractNumber || `CTR-${new Date().getFullYear()}-LOCAL`,
+        segmentId: payload.segmentId,
+        contacts: payload.contactName
+          ? [
+              {
+                name: payload.contactName,
+                phone: payload.contactPhone || "",
+                email: payload.contactEmail || "",
+                isPrimary: true,
+              },
+            ]
+          : [],
         assets: 0,
         open: 0,
       };
@@ -4773,8 +5395,18 @@ export default function Home() {
           const created = await equipmentStandardMutation.mutateAsync({
             code: payload.code,
             name: payload.name,
-            category: payload.category,
-            manufacturer: payload.manufacturer,
+            category: store.equipmentCategories.find(
+              item => item.id === payload.categoryId
+            )?.name,
+            categoryId: /^\d+$/.test(payload.categoryId || "")
+              ? Number(payload.categoryId)
+              : undefined,
+            manufacturer: store.equipmentManufacturers.find(
+              item => item.id === payload.manufacturerId
+            )?.name,
+            manufacturerId: /^\d+$/.test(payload.manufacturerId || "")
+              ? Number(payload.manufacturerId)
+              : undefined,
             model: payload.model,
             description: payload.description,
           });
@@ -4787,8 +5419,15 @@ export default function Home() {
         id,
         code: payload.code || "PAD-NOVO",
         name: payload.name || "Novo padrão",
-        category: payload.category || "Porta industrial",
-        manufacturer: payload.manufacturer || "Inovadoor",
+        category:
+          store.equipmentCategories.find(item => item.id === payload.categoryId)
+            ?.name || "Porta industrial",
+        categoryId: payload.categoryId,
+        manufacturer:
+          store.equipmentManufacturers.find(
+            item => item.id === payload.manufacturerId
+          )?.name || "Inovadoor",
+        manufacturerId: payload.manufacturerId,
         model: payload.model || "Modelo pendente",
         description: payload.description || "Descrição pendente",
       };
@@ -4821,6 +5460,9 @@ export default function Home() {
             serialNumber,
             installationLocation:
               payload.installationLocation || "Local pendente",
+            environmentId: /^\d+$/.test(payload.environmentId || "")
+              ? Number(payload.environmentId)
+              : undefined,
             state:
               payload.state === "Manutenção"
                 ? "manutencao"
@@ -4844,6 +5486,7 @@ export default function Home() {
         standardId: payload.standardId || "",
         serialNumber,
         installationLocation: payload.installationLocation || "Local pendente",
+        environmentId: payload.environmentId,
         state: (payload.state as Equipment["state"]) || "Operacional",
         lastMaintenance: now,
       };
@@ -4891,11 +5534,54 @@ export default function Home() {
       );
     }
     if (modal === "thirdParty") {
+      if (authenticated) {
+        try {
+          await thirdPartyMutation.mutateAsync({
+            name: payload.name || "Novo fornecedor",
+            region: payload.region || undefined,
+            baseAddress: payload.baseAddress || undefined,
+            serviceRadiusKm: Number(payload.serviceRadiusKm || 0),
+            teamCount: Number(payload.teamCount || 0),
+            contactName: payload.contactName || undefined,
+            contactPhone: payload.contactPhone || undefined,
+            contactEmail: payload.contactEmail || undefined,
+            status:
+              payload.status === "Homologado"
+                ? "homologado"
+                : payload.status === "Bloqueado"
+                  ? "bloqueado"
+                  : "em_revisao",
+            contacts: payload.contactName
+              ? [
+                  {
+                    name: payload.contactName,
+                    phone: payload.contactPhone || undefined,
+                    email: payload.contactEmail || undefined,
+                  },
+                ]
+              : undefined,
+          });
+        } catch {
+          // O cadastro local continua disponível para homologação demonstrativa.
+        }
+      }
       const item: ThirdParty = {
         id: makeId("tp"),
         name: payload.name || "Novo fornecedor",
         region: payload.region || "A definir",
-        contact: payload.contact || "Contato pendente",
+        contact: payload.contactName || payload.contact || "Contato pendente",
+        baseAddress: payload.baseAddress || "Base não informada",
+        serviceRadiusKm: Number(payload.serviceRadiusKm || 0),
+        teamCount: Number(payload.teamCount || 0),
+        contacts: payload.contactName
+          ? [
+              {
+                name: payload.contactName,
+                phone: payload.contactPhone || "",
+                email: payload.contactEmail || "",
+              },
+            ]
+          : [],
         open: 0,
         sla: Number(payload.sla || 90),
         status: (payload.status as ThirdParty["status"]) || "Em revisão",
@@ -4929,6 +5615,27 @@ export default function Home() {
       setToast(`${item.id} criada com formulário vinculado.`);
     }
     if (modal === "ticket") {
+      if (authenticated && /^\d+$/.test(store.customers[0]?.id || "")) {
+        try {
+          await ticketMutation.mutateAsync({
+            customerId: Number(store.customers[0]?.id),
+            equipmentId: /^\d+$/.test(payload.equipmentId || "")
+              ? Number(payload.equipmentId)
+              : undefined,
+            externalId: `CH-${Date.now()}`,
+            title: payload.title || "Chamado do cliente",
+            description: payload.description || "Descrição pendente",
+            priority:
+              payload.priority === "Alta"
+                ? "alta"
+                : payload.priority === "Baixa"
+                  ? "baixa"
+                  : "media",
+          });
+        } catch {
+          // O modo local continua disponível durante a homologação.
+        }
+      }
       const ticket: Ticket = {
         id: `CH-${Math.floor(1000 + Math.random() * 8999)}`,
         customerId: store.customers[0]?.id ?? "",
@@ -5108,6 +5815,7 @@ export default function Home() {
       <LoginPanel
         role={activeRole}
         setRole={setActiveRole}
+        onRealLogin={startLogin}
         onEnter={() => {
           setShowLogin(false);
           if (activeRole === "campo") return;
@@ -5148,11 +5856,27 @@ export default function Home() {
     );
   if (activeRole === "cliente")
     return (
-      <ClientPortal
-        store={store}
-        onExit={() => setShowLogin(true)}
-        onOpenTicket={() => openModal("ticket")}
-      />
+      <>
+        <ClientPortal
+          store={store}
+          onExit={() => setShowLogin(true)}
+          onOpenTicket={() => openModal("ticket")}
+        />
+        {modal === "ticket" && (
+          <CreateModal
+            modal="ticket"
+            store={store}
+            onClose={() => setModal(null)}
+            onSave={saveModal}
+          />
+        )}
+        {toast && (
+          <div className="fixed bottom-5 right-5 z-[70] flex max-w-sm items-center gap-3 rounded-2xl bg-[#0d1d2e] px-4 py-3 text-xs font-semibold text-white shadow-2xl">
+            <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+            {toast}
+          </div>
+        )}
+      </>
     );
 
   const renderSection = () => {
@@ -5553,10 +6277,10 @@ export default function Home() {
                 </span>
                 <span className="hidden text-left sm:block">
                   <span className="block text-xs font-bold text-slate-700">
-                    Beatriz Inovadoor
+                    {auth.user?.name || roleLabel}
                   </span>
                   <span className="block text-[10px] text-slate-400">
-                    Administradora
+                    {auth.user?.email || "Acesso por perfil"}
                   </span>
                 </span>
                 <ChevronDown className="hidden h-3.5 w-3.5 text-slate-400 sm:block" />

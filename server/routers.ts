@@ -7,12 +7,16 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   convertCustomerTicketToWorkOrder,
   createCustomer,
+  createCustomerSegment,
   createCustomerTicket,
   createEquipment,
   createEquipmentCatalog,
   createCustomFormDefinition,
   createServiceFormTemplate,
   createThirdParty,
+  createEquipmentCategory,
+  createEquipmentManufacturer,
+  createInstallationEnvironment,
   createWorkOrder,
   addWorkOrderEvidence,
   assignUserScope,
@@ -22,14 +26,20 @@ import {
   linkEquipmentToCustomer,
   installEquipmentFromCatalog,
   listCustomers,
+  listCustomerSegments,
+  listCustomerContacts,
   listCustomerTickets,
   listCustomFormDefinitions,
   updateCustomFormDefinition,
   listEquipment,
   listEquipmentCatalogs,
+  listEquipmentCategories,
+  listEquipmentManufacturers,
+  listInstallationEnvironments,
   listServiceFormTemplates,
   listTeamMembers,
   listThirdParties,
+  listThirdPartyContacts,
   listWorkOrderEvidence,
   listWorkOrders,
   listMondaySimulatedItems,
@@ -42,6 +52,7 @@ import {
   updateTechnicalRequest,
   convertTechnicalRequestToWorkOrder,
   listNotifications,
+  listOrganizationUsers,
   markAllNotificationsRead,
   markNotificationRead,
   simulateMondayInbound,
@@ -76,6 +87,9 @@ export const appRouter = router({
     }),
   }),
   users: router({
+    list: managerProcedure.query(({ ctx }) =>
+      listOrganizationUsers(organizationIdFor(ctx.user))
+    ),
     assignScope: managerProcedure
       .input(
         z
@@ -197,17 +211,48 @@ export const appRouter = router({
     list: protectedProcedure.query(({ ctx }) =>
       listCustomers(organizationIdFor(ctx.user))
     ),
+    segments: router({
+      list: protectedProcedure.query(({ ctx }) =>
+        listCustomerSegments(organizationIdFor(ctx.user))
+      ),
+      create: managerProcedure
+        .input(z.object({ name: z.string().min(2).max(120) }))
+        .mutation(({ ctx, input }) =>
+          createCustomerSegment({
+            organizationId: organizationIdFor(ctx.user),
+            name: input.name,
+          })
+        ),
+    }),
+    contacts: protectedProcedure
+      .input(z.object({ customerId: z.number().int().positive() }))
+      .query(({ ctx, input }) =>
+        listCustomerContacts(organizationIdFor(ctx.user), input.customerId)
+      ),
     create: managerProcedure
       .input(
         z.object({
           name: z.string().min(2).max(180),
           document: z.string().max(30).optional(),
+          contractNumber: z.string().max(60).optional(),
+          segmentId: optionalId,
           city: z.string().max(100).optional(),
           state: z.string().length(2).optional(),
           address: z.string().max(1000).optional(),
           contactName: z.string().max(160).optional(),
           contactEmail: z.string().email().optional(),
           contactPhone: z.string().max(40).optional(),
+          contacts: z
+            .array(
+              z.object({
+                name: z.string().min(2).max(160),
+                phone: z.string().max(40).optional(),
+                email: z.string().email().optional(),
+                isPrimary: z.boolean().optional(),
+              })
+            )
+            .max(20)
+            .optional(),
         })
       )
       .mutation(({ ctx, input }) =>
@@ -230,13 +275,41 @@ export const appRouter = router({
       list: protectedProcedure.query(({ ctx }) =>
         listEquipmentCatalogs(organizationIdFor(ctx.user))
       ),
+      categories: router({
+        list: protectedProcedure.query(({ ctx }) =>
+          listEquipmentCategories(organizationIdFor(ctx.user))
+        ),
+        create: managerProcedure
+          .input(z.object({ name: z.string().min(2).max(120) }))
+          .mutation(({ ctx, input }) =>
+            createEquipmentCategory({
+              organizationId: organizationIdFor(ctx.user),
+              name: input.name,
+            })
+          ),
+      }),
+      manufacturers: router({
+        list: protectedProcedure.query(({ ctx }) =>
+          listEquipmentManufacturers(organizationIdFor(ctx.user))
+        ),
+        create: managerProcedure
+          .input(z.object({ name: z.string().min(2).max(120) }))
+          .mutation(({ ctx, input }) =>
+            createEquipmentManufacturer({
+              organizationId: organizationIdFor(ctx.user),
+              name: input.name,
+            })
+          ),
+      }),
       create: managerProcedure
         .input(
           z.object({
             code: z.string().min(2).max(80),
             name: z.string().min(2).max(180),
             category: z.string().max(120).optional(),
+            categoryId: optionalId,
             manufacturer: z.string().max(120).optional(),
+            manufacturerId: optionalId,
             model: z.string().max(120).optional(),
             description: z.string().max(4000).optional(),
           })
@@ -279,6 +352,7 @@ export const appRouter = router({
           customerId: z.number().int().positive(),
           serialNumber: z.string().min(2).max(120),
           installationLocation: z.string().min(2).max(180),
+          environmentId: optionalId,
           state: z
             .enum(["operacional", "manutencao", "atencao", "baixado"])
             .default("operacional"),
@@ -291,6 +365,24 @@ export const appRouter = router({
           organizationId: organizationIdFor(ctx.user),
         })
       ),
+    environments: router({
+      list: protectedProcedure.query(({ ctx }) =>
+        listInstallationEnvironments(organizationIdFor(ctx.user))
+      ),
+      create: managerProcedure
+        .input(
+          z.object({
+            name: z.string().min(2).max(160),
+            description: z.string().max(1000).optional(),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          createInstallationEnvironment({
+            organizationId: organizationIdFor(ctx.user),
+            ...input,
+          })
+        ),
+    }),
     linkCustomer: managerProcedure
       .input(
         z.object({
@@ -319,14 +411,33 @@ export const appRouter = router({
     list: protectedProcedure.query(({ ctx }) =>
       listThirdParties(organizationIdFor(ctx.user))
     ),
+    contacts: protectedProcedure
+      .input(z.object({ thirdPartyId: z.number().int().positive() }))
+      .query(({ ctx, input }) =>
+        listThirdPartyContacts(organizationIdFor(ctx.user), input.thirdPartyId)
+      ),
     create: managerProcedure
       .input(
         z.object({
           name: z.string().min(2).max(180),
           document: z.string().max(30).optional(),
           region: z.string().max(100).optional(),
+          baseAddress: z.string().max(1000).optional(),
+          serviceRadiusKm: z.number().int().min(0).max(5000).default(0),
+          teamCount: z.number().int().min(0).max(1000).default(0),
           contactName: z.string().max(160).optional(),
+          contactPhone: z.string().max(40).optional(),
           contactEmail: z.string().email().optional(),
+          contacts: z
+            .array(
+              z.object({
+                name: z.string().min(2).max(160),
+                phone: z.string().max(40).optional(),
+                email: z.string().email().optional(),
+              })
+            )
+            .max(20)
+            .optional(),
           status: z
             .enum(["homologado", "em_revisao", "bloqueado"])
             .default("em_revisao"),

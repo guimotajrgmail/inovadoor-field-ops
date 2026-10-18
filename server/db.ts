@@ -2,12 +2,17 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   customers,
+  customerContacts,
+  customerSegments,
   customerTickets,
   customFormDefinitions,
   equipment,
   equipmentCatalogs,
+  equipmentCategories,
+  equipmentManufacturers,
   installationPlanVisibility,
   installationPlans,
+  installationEnvironments,
   integrationConnections,
   mondaySimulatedItems,
   notifications,
@@ -15,6 +20,7 @@ import {
   teamMembers,
   technicalRequests,
   thirdParties,
+  thirdPartyContacts,
   users,
   workOrderEvents,
   workOrderEvidence,
@@ -119,6 +125,25 @@ export async function assignUserScope(input: {
     .where(eq(users.id, input.userId))
     .limit(1);
   return result[0];
+}
+
+export async function listOrganizationUsers(organizationId: number) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  return db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      accessProfile: users.accessProfile,
+      lastSignedIn: users.lastSignedIn,
+      customerId: users.customerId,
+      thirdPartyId: users.thirdPartyId,
+    })
+    .from(users)
+    .where(eq(users.organizationId, organizationId))
+    .orderBy(users.name);
 }
 
 export async function listNotifications(
@@ -337,32 +362,128 @@ export async function listCustomers(organizationId: number) {
     .orderBy(customers.name);
 }
 
+export async function listCustomerSegments(organizationId: number) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  return db
+    .select()
+    .from(customerSegments)
+    .where(
+      and(
+        eq(customerSegments.organizationId, organizationId),
+        eq(customerSegments.active, 1)
+      )
+    )
+    .orderBy(customerSegments.name);
+}
+
+export async function createCustomerSegment(input: {
+  organizationId: number;
+  name: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.insert(customerSegments).values(input);
+  const rows = await db
+    .select()
+    .from(customerSegments)
+    .where(
+      and(
+        eq(customerSegments.organizationId, input.organizationId),
+        eq(customerSegments.name, input.name)
+      )
+    )
+    .orderBy(desc(customerSegments.id))
+    .limit(1);
+  return rows[0];
+}
+
+export async function listCustomerContacts(
+  organizationId: number,
+  customerId: number
+) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  return db
+    .select()
+    .from(customerContacts)
+    .where(
+      and(
+        eq(customerContacts.organizationId, organizationId),
+        eq(customerContacts.customerId, customerId)
+      )
+    )
+    .orderBy(customerContacts.name);
+}
+
 export async function createCustomer(input: {
   organizationId: number;
   name: string;
   document?: string;
+  contractNumber?: string;
+  segmentId?: number;
   city?: string;
   state?: string;
   address?: string;
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
+  contacts?: Array<{
+    name: string;
+    phone?: string;
+    email?: string;
+    isPrimary?: boolean;
+  }>;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
-  await db.insert(customers).values(input);
+  const year = new Date().getFullYear();
+  const [latest] = await db
+    .select({ id: customers.id })
+    .from(customers)
+    .where(eq(customers.organizationId, input.organizationId))
+    .orderBy(desc(customers.id))
+    .limit(1);
+  const contractNumber =
+    input.contractNumber ||
+    `CTR-${year}-${String((latest?.id ?? 0) + 1).padStart(5, "0")}`;
+  await db.insert(customers).values({
+    organizationId: input.organizationId,
+    name: input.name,
+    document: input.document,
+    contractNumber,
+    segmentId: input.segmentId,
+    city: input.city,
+    state: input.state,
+    address: input.address,
+    contactName: input.contactName,
+    contactEmail: input.contactEmail,
+    contactPhone: input.contactPhone,
+  });
   const rows = await db
     .select()
     .from(customers)
     .where(
       and(
         eq(customers.organizationId, input.organizationId),
-        eq(customers.name, input.name)
+        eq(customers.contractNumber, contractNumber)
       )
     )
-    .orderBy(desc(customers.id))
     .limit(1);
-  return rows[0];
+  const customer = rows[0];
+  if (customer && input.contacts?.length) {
+    await db.insert(customerContacts).values(
+      input.contacts.map(contact => ({
+        organizationId: input.organizationId,
+        customerId: customer.id,
+        name: contact.name,
+        phone: contact.phone,
+        email: contact.email,
+        isPrimary: contact.isPrimary ? 1 : 0,
+      }))
+    );
+  }
+  return customer;
 }
 
 export async function listEquipment(
@@ -385,6 +506,110 @@ export async function listEquipment(
     .orderBy(desc(equipment.updatedAt));
 }
 
+export async function listEquipmentCategories(organizationId: number) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  return db
+    .select()
+    .from(equipmentCategories)
+    .where(
+      and(
+        eq(equipmentCategories.organizationId, organizationId),
+        eq(equipmentCategories.active, 1)
+      )
+    )
+    .orderBy(equipmentCategories.name);
+}
+
+export async function createEquipmentCategory(input: {
+  organizationId: number;
+  name: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.insert(equipmentCategories).values(input);
+  const rows = await db
+    .select()
+    .from(equipmentCategories)
+    .where(
+      and(
+        eq(equipmentCategories.organizationId, input.organizationId),
+        eq(equipmentCategories.name, input.name)
+      )
+    )
+    .orderBy(desc(equipmentCategories.id))
+    .limit(1);
+  return rows[0];
+}
+
+export async function listEquipmentManufacturers(organizationId: number) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  return db
+    .select()
+    .from(equipmentManufacturers)
+    .where(
+      and(
+        eq(equipmentManufacturers.organizationId, organizationId),
+        eq(equipmentManufacturers.active, 1)
+      )
+    )
+    .orderBy(equipmentManufacturers.name);
+}
+
+export async function createEquipmentManufacturer(input: {
+  organizationId: number;
+  name: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.insert(equipmentManufacturers).values(input);
+  const rows = await db
+    .select()
+    .from(equipmentManufacturers)
+    .where(
+      and(
+        eq(equipmentManufacturers.organizationId, input.organizationId),
+        eq(equipmentManufacturers.name, input.name)
+      )
+    )
+    .orderBy(desc(equipmentManufacturers.id))
+    .limit(1);
+  return rows[0];
+}
+
+export async function listInstallationEnvironments(organizationId: number) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  return db
+    .select()
+    .from(installationEnvironments)
+    .where(eq(installationEnvironments.organizationId, organizationId))
+    .orderBy(installationEnvironments.name);
+}
+
+export async function createInstallationEnvironment(input: {
+  organizationId: number;
+  name: string;
+  description?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.insert(installationEnvironments).values(input);
+  const rows = await db
+    .select()
+    .from(installationEnvironments)
+    .where(
+      and(
+        eq(installationEnvironments.organizationId, input.organizationId),
+        eq(installationEnvironments.name, input.name)
+      )
+    )
+    .orderBy(desc(installationEnvironments.id))
+    .limit(1);
+  return rows[0];
+}
+
 export async function listEquipmentCatalogs(organizationId: number) {
   const db = await getDb();
   if (!db || !organizationId) return [];
@@ -405,7 +630,9 @@ export async function createEquipmentCatalog(input: {
   code: string;
   name: string;
   category?: string;
+  categoryId?: number;
   manufacturer?: string;
+  manufacturerId?: number;
   model?: string;
   description?: string;
 }) {
@@ -431,6 +658,7 @@ export async function installEquipmentFromCatalog(input: {
   customerId: number;
   serialNumber: string;
   installationLocation: string;
+  environmentId?: number;
   state?: "operacional" | "manutencao" | "atencao" | "baixado";
   notes?: string;
 }) {
@@ -482,6 +710,7 @@ export async function installEquipmentFromCatalog(input: {
     model: catalog.model ?? undefined,
     serialNumber: input.serialNumber,
     installationLocation: input.installationLocation,
+    environmentId: input.environmentId,
     state: input.state ?? "operacional",
     installedAt: new Date(),
     qrCode: `EQUIP:${code}`,
@@ -596,19 +825,52 @@ export async function listThirdParties(organizationId: number) {
     .orderBy(thirdParties.name);
 }
 
+export async function listThirdPartyContacts(
+  organizationId: number,
+  thirdPartyId: number
+) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  return db
+    .select()
+    .from(thirdPartyContacts)
+    .where(
+      and(
+        eq(thirdPartyContacts.organizationId, organizationId),
+        eq(thirdPartyContacts.thirdPartyId, thirdPartyId)
+      )
+    )
+    .orderBy(thirdPartyContacts.name);
+}
+
 export async function createThirdParty(input: {
   organizationId: number;
   name: string;
   document?: string;
   region?: string;
+  baseAddress?: string;
+  serviceRadiusKm?: number;
+  teamCount?: number;
   contactName?: string;
   contactEmail?: string;
+  contactPhone?: string;
+  contacts?: Array<{ name: string; phone?: string; email?: string }>;
   status?: "homologado" | "em_revisao" | "bloqueado";
-  slaPercent?: number;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
-  await db.insert(thirdParties).values(input);
+  await db.insert(thirdParties).values({
+    organizationId: input.organizationId,
+    name: input.name,
+    document: input.document,
+    region: input.region,
+    baseAddress: input.baseAddress,
+    serviceRadiusKm: input.serviceRadiusKm ?? 0,
+    teamCount: input.teamCount ?? 0,
+    contactName: input.contactName,
+    contactEmail: input.contactEmail,
+    status: input.status ?? "em_revisao",
+  });
   const rows = await db
     .select()
     .from(thirdParties)
@@ -620,7 +882,19 @@ export async function createThirdParty(input: {
     )
     .orderBy(desc(thirdParties.id))
     .limit(1);
-  return rows[0];
+  const thirdParty = rows[0];
+  if (thirdParty && input.contacts?.length) {
+    await db.insert(thirdPartyContacts).values(
+      input.contacts.map(contact => ({
+        organizationId: input.organizationId,
+        thirdPartyId: thirdParty.id,
+        name: contact.name,
+        phone: contact.phone,
+        email: contact.email,
+      }))
+    );
+  }
+  return thirdParty;
 }
 
 export async function listServiceFormTemplates(organizationId: number) {
