@@ -149,12 +149,10 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const reactPath = fs.realpathSync(
-  path.join(PROJECT_ROOT, "node_modules", "react")
-);
-const reactDomPath = fs.realpathSync(
-  path.join(PROJECT_ROOT, "node_modules", "react-dom")
-);
+// Keep these as static paths: server/_core/vite.ts imports this config in
+// production, where the source node_modules directory is not present.
+const reactPath = path.resolve(PROJECT_ROOT, "node_modules", "react");
+const reactDomPath = path.resolve(PROJECT_ROOT, "node_modules", "react-dom");
 
 const vitePreviewCompatibilityPlugin: Plugin = {
   name: "manus-preview-no-vite-client",
