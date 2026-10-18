@@ -20,6 +20,7 @@ import {
   createTeamMember,
   createWorkOrder,
   addWorkOrderEvidence,
+  addCustomerTicketEvidence,
   assignUserScope,
   getDashboardSummary,
   getIntegrationConnection,
@@ -30,6 +31,7 @@ import {
   listCustomerSegments,
   listCustomerContacts,
   listCustomerTickets,
+  listCustomerTicketEvidence,
   listCustomFormDefinitions,
   updateCustomFormDefinition,
   listEquipment,
@@ -658,6 +660,32 @@ export const appRouter = router({
           organizationId: organizationIdFor(ctx.user),
         });
       }),
+    evidence: router({
+      list: protectedProcedure
+        .input(z.object({ ticketId: z.number().int().positive() }))
+        .query(({ ctx, input }) =>
+          listCustomerTicketEvidence(
+            organizationIdFor(ctx.user),
+            input.ticketId
+          )
+        ),
+      add: protectedProcedure
+        .input(
+          z.object({
+            ticketId: z.number().int().positive(),
+            type: z.enum(["foto", "video"]),
+            fileName: z.string().min(1).max(180),
+            mimeType: z.string().min(3).max(120),
+            dataUrl: z.string().startsWith("data:").max(30_000_000),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          addCustomerTicketEvidence({
+            ...input,
+            organizationId: organizationIdFor(ctx.user),
+          })
+        ),
+    }),
     convertToWorkOrder: managerProcedure
       .input(
         z.object({

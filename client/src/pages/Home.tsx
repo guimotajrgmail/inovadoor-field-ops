@@ -211,6 +211,15 @@ type Ticket = {
   priority: "Alta" | "Média" | "Baixa";
   status: "Novo" | "Em triagem" | "Convertido em OS";
   created: string;
+  photoCount?: number;
+  videoCount?: number;
+};
+type TicketAttachmentDraft = {
+  name: string;
+  type: "foto" | "video";
+  mimeType: string;
+  dataUrl: string;
+  size: number;
 };
 type EvidencePayload = {
   type: "foto" | "assinatura";
@@ -757,6 +766,16 @@ function cx(...classes: Array<string | false | undefined>) {
 
 function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Falha ao ler arquivo"));
+    reader.readAsDataURL(file);
+  });
 }
 
 function StatusPill({
@@ -4447,6 +4466,8 @@ function CreateModal({
         }
       : {}),
   }));
+  const [ticketPhotos, setTicketPhotos] = useState<TicketAttachmentDraft[]>([]);
+  const [ticketVideos, setTicketVideos] = useState<TicketAttachmentDraft[]>([]);
   const update = (key: string, value: string) =>
     setValues(current => ({ ...current, [key]: value }));
   const title: Record<Exclude<ModalKey, null>, string> = {
@@ -4462,9 +4483,45 @@ function CreateModal({
     customForm: "Criar formulário de cadastro",
   };
   const definition = store.customForms.find(form => form.entityType === modal);
+  const addTicketFiles = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+    kind: "foto" | "video"
+  ) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    const maxBytes = kind === "video" ? 20 * 1024 * 1024 : 8 * 1024 * 1024;
+    const accepted = files.filter(file => {
+      const validType =
+        kind === "foto"
+          ? file.type.startsWith("image/")
+          : file.type.startsWith("video/");
+      return validType && file.size <= maxBytes;
+    });
+    const rejected = files.length - accepted.length;
+    const loaded = await Promise.all(
+      accepted.map(async file => ({
+        name: file.name,
+        type: kind,
+        mimeType: file.type || (kind === "foto" ? "image/jpeg" : "video/mp4"),
+        dataUrl: await readFileAsDataUrl(file),
+        size: file.size,
+      }))
+    );
+    if (kind === "foto") setTicketPhotos(current => [...current, ...loaded]);
+    else setTicketVideos(current => [...current, ...loaded]);
+    if (rejected > 0) {
+      window.alert(
+        `${rejected} arquivo(s) ignorado(s). Fotos: até 8 MB; vídeos: até 20 MB.`
+      );
+    }
+  };
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    onSave(values);
+    onSave({
+      ...values,
+      ticketPhotos: JSON.stringify(ticketPhotos),
+      ticketVideos: JSON.stringify(ticketVideos),
+    });
   };
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-4 sm:items-center">
@@ -5163,6 +5220,109 @@ function CreateModal({
                   placeholder="Explique o que aconteceu, quando começou e se há risco operacional"
                 />
               </div>
+              <div className="sm:col-span-2 grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                  <div className="flex items-center gap-2">
+                    <Camera className="h-4 w-4 text-orange-600" />
+                    <p className="text-xs font-bold text-slate-800">
+                      Fotos do problema
+                    </p>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                    PNG, JPG ou WEBP · até 8 MB por foto
+                  </p>
+                  <label className="mt-3 flex cursor-pointer items-center justify-center rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-orange-50">
+                    Selecionar fotos
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="sr-only"
+                      onChange={event => void addTicketFiles(event, "foto")}
+                    />
+                  </label>
+                  {ticketPhotos.length > 0 && (
+                    <div className="mt-3 grid grid-cols-4 gap-2">
+                      {ticketPhotos.map((file, index) => (
+                        <div
+                          key={`${file.name}-${index}`}
+                          className="relative aspect-square overflow-hidden rounded-lg bg-slate-200"
+                        >
+                          <img
+                            src={file.dataUrl}
+                            alt={file.name}
+                            className="h-full w-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setTicketPhotos(current =>
+                                current.filter(
+                                  (_, itemIndex) => itemIndex !== index
+                                )
+                              )
+                            }
+                            className="absolute right-1 top-1 rounded-full bg-slate-950/70 p-1 text-white"
+                            aria-label={`Remover foto ${file.name}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-blue-600" />
+                    <p className="text-xs font-bold text-slate-800">
+                      Vídeos do problema
+                    </p>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                    MP4, MOV ou WEBM · até 20 MB por vídeo
+                  </p>
+                  <label className="mt-3 flex cursor-pointer items-center justify-center rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-blue-50">
+                    Selecionar vídeos
+                    <input
+                      type="file"
+                      accept="video/*"
+                      multiple
+                      className="sr-only"
+                      onChange={event => void addTicketFiles(event, "video")}
+                    />
+                  </label>
+                  {ticketVideos.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {ticketVideos.map((file, index) => (
+                        <div
+                          key={`${file.name}-${index}`}
+                          className="flex items-center gap-2 rounded-lg bg-white p-2 text-[11px] text-slate-600 ring-1 ring-slate-200"
+                        >
+                          <FileText className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+                          <span className="min-w-0 flex-1 truncate">
+                            {file.name}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setTicketVideos(current =>
+                                current.filter(
+                                  (_, itemIndex) => itemIndex !== index
+                                )
+                              )
+                            }
+                            className="rounded-md p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                            aria-label={`Remover vídeo ${file.name}`}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </>
           )}
           {modal !== "customForm" &&
@@ -5277,6 +5437,8 @@ export default function Home() {
   const thirdPartyMutation = trpc.thirdParties.create.useMutation();
   const personMutation = trpc.people.create.useMutation();
   const ticketMutation = trpc.customerTickets.create.useMutation();
+  const ticketEvidenceMutation =
+    trpc.customerTickets.evidence.add.useMutation();
   const createFormMutation = trpc.forms.create.useMutation();
   const createCustomFormMutation = trpc.customForms.create.useMutation();
   const updateCustomFormMutation = trpc.customForms.update.useMutation();
@@ -5815,14 +5977,30 @@ export default function Home() {
       setToast(`${item.id} criada com formulário vinculado.`);
     }
     if (modal === "ticket") {
+      const parseAttachments = (key: string, type: "foto" | "video") => {
+        try {
+          const parsed = JSON.parse(
+            payload[key] || "[]"
+          ) as TicketAttachmentDraft[];
+          return parsed.filter(
+            item => item?.type === type && item?.dataUrl && item?.name
+          );
+        } catch {
+          return [];
+        }
+      };
+      const photos = parseAttachments("ticketPhotos", "foto");
+      const videos = parseAttachments("ticketVideos", "video");
+      const externalId = `CH-${Date.now()}`;
+      let persistedTicketId: number | undefined;
       if (authenticated && /^\d+$/.test(store.customers[0]?.id || "")) {
         try {
-          await ticketMutation.mutateAsync({
+          const created = await ticketMutation.mutateAsync({
             customerId: Number(store.customers[0]?.id),
             equipmentId: /^\d+$/.test(payload.equipmentId || "")
               ? Number(payload.equipmentId)
               : undefined,
-            externalId: `CH-${Date.now()}`,
+            externalId,
             title: payload.title || "Chamado do cliente",
             description: payload.description || "Descrição pendente",
             priority:
@@ -5832,6 +6010,18 @@ export default function Home() {
                   ? "baixa"
                   : "media",
           });
+          persistedTicketId = created?.id;
+          if (persistedTicketId) {
+            for (const attachment of [...photos, ...videos]) {
+              await ticketEvidenceMutation.mutateAsync({
+                ticketId: persistedTicketId,
+                type: attachment.type,
+                fileName: attachment.name,
+                mimeType: attachment.mimeType,
+                dataUrl: attachment.dataUrl,
+              });
+            }
+          }
         } catch {
           // O modo local continua disponível durante a homologação.
         }
@@ -5845,6 +6035,8 @@ export default function Home() {
         priority: (payload.priority as Ticket["priority"]) || "Média",
         status: "Novo",
         created: "Agora",
+        photoCount: photos.length,
+        videoCount: videos.length,
       };
       const order: WorkOrder = {
         id: `OS-2026-${Math.floor(1000 + Math.random() * 8999)}`,

@@ -94,6 +94,20 @@ describe("Inovadoor Field Ops", () => {
     expect(Array.isArray(forms)).toBe(true);
   });
 
+  it("protects customer ticket photo and video evidence", async () => {
+    const anonymous = appRouter.createCaller(createContext());
+    await expect(
+      anonymous.customerTickets.evidence.list({ ticketId: 1 })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+
+    const manager = appRouter.createCaller(createContext(sampleUser));
+    const evidence = await manager.customerTickets.evidence.list({
+      ticketId: 1,
+    });
+    expect(Array.isArray(evidence)).toBe(true);
+    expect(evidence.every(item => item.organizationId === 1)).toBe(true);
+  });
+
   it("protects customer, equipment, third-party and form creation for managers", async () => {
     const caller = appRouter.createCaller(createContext(fieldUser));
     await expect(

@@ -329,6 +329,18 @@ export const customerTickets = mysqlTable("customerTickets", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const customerTicketEvidence = mysqlTable("customerTicketEvidence", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  ticketId: int("ticketId").notNull(),
+  type: mysqlEnum("type", ["foto", "video"]).notNull(),
+  fileName: varchar("fileName", { length: 180 }).notNull(),
+  fileKey: varchar("fileKey", { length: 255 }).notNull(),
+  fileUrl: varchar("fileUrl", { length: 500 }).notNull(),
+  mimeType: varchar("mimeType", { length: 120 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const workOrderEvidence = mysqlTable("workOrderEvidence", {
   id: int("id").autoincrement().primaryKey(),
   organizationId: int("organizationId").notNull(),

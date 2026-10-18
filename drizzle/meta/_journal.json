@@ -71,6 +71,13 @@
       "when": 1792289581598,
       "tag": "0009_high_raider",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1792296752968,
+      "tag": "0010_slippery_the_stranger",
+      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,7 @@ import {
   customers,
   customerContacts,
   customerSegments,
+  customerTicketEvidence,
   customerTickets,
   customFormDefinitions,
   equipment,
@@ -1143,6 +1144,72 @@ export async function createCustomerTicket(input: {
     .where(eq(customerTickets.externalId, input.externalId))
     .limit(1);
   return rows[0];
+}
+
+export async function listCustomerTicketEvidence(
+  organizationId: number,
+  ticketId: number
+) {
+  const db = await getDb();
+  if (!db || !organizationId) return [];
+  return db
+    .select()
+    .from(customerTicketEvidence)
+    .where(
+      and(
+        eq(customerTicketEvidence.organizationId, organizationId),
+        eq(customerTicketEvidence.ticketId, ticketId)
+      )
+    )
+    .orderBy(desc(customerTicketEvidence.createdAt));
+}
+
+export async function addCustomerTicketEvidence(input: {
+  organizationId: number;
+  ticketId: number;
+  type: "foto" | "video";
+  fileName: string;
+  mimeType: string;
+  dataUrl: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const [ticket] = await db
+    .select({ id: customerTickets.id })
+    .from(customerTickets)
+    .where(
+      and(
+        eq(customerTickets.id, input.ticketId),
+        eq(customerTickets.organizationId, input.organizationId)
+      )
+    )
+    .limit(1);
+  if (!ticket) throw new Error("Customer ticket not found");
+  const match = input.dataUrl.match(/^data:[^;]+;base64,(.+)$/);
+  if (!match?.[1])
+    throw new Error("Ticket attachment must be a base64 data URL");
+  const data = Buffer.from(match[1], "base64");
+  const maxBytes = input.type === "video" ? 20 * 1024 * 1024 : 8 * 1024 * 1024;
+  if (data.byteLength > maxBytes) {
+    throw new Error(
+      `Ticket ${input.type} attachment is larger than ${maxBytes / 1024 / 1024} MB`
+    );
+  }
+  const uploaded = await storagePut(
+    `customer-tickets/${input.organizationId}/${input.ticketId}/${input.fileName}`,
+    data,
+    input.mimeType
+  );
+  await db.insert(customerTicketEvidence).values({
+    organizationId: input.organizationId,
+    ticketId: input.ticketId,
+    type: input.type,
+    fileName: input.fileName,
+    fileKey: uploaded.key,
+    fileUrl: uploaded.url,
+    mimeType: input.mimeType,
+  });
+  return uploaded;
 }
 
 export async function convertCustomerTicketToWorkOrder(input: {
