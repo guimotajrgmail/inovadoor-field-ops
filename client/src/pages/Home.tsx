@@ -4644,11 +4644,47 @@ function CustomFieldsPanel({
   onChange: (key: string, value: string) => void;
 }) {
   if (!definition || definition.fields.length === 0) return null;
-  const visibleFields = definition.fields.filter(
-    field =>
+  const normalizeFieldText = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  const customerStandardKeys = new Set([
+    "name",
+    "nome",
+    "nomeCliente",
+    "razaoSocial",
+    "contract",
+    "contractNumber",
+    "contrato",
+    "segmento",
+    "segmentId",
+    "city",
+    "state",
+    "address",
+    "contact",
+    "contactName",
+    "contactPhone",
+    "contactEmail",
+  ]);
+  const visibleFields = definition.fields.filter(field => {
+    const duplicatesCustomerStandard =
+      definition.entityType === "customer" &&
+      (customerStandardKeys.has(field.key) ||
+        [
+          "nome do cliente",
+          "razao social",
+          "numero do contrato",
+          "segmento do cliente",
+        ].includes(normalizeFieldText(field.label)));
+    if (duplicatesCustomerStandard) return false;
+    return (
       !field.condition ||
       values[field.condition.fieldKey] === field.condition.equals
-  );
+    );
+  });
+  if (visibleFields.length === 0) return null;
   return (
     <div className="sm:col-span-2 rounded-xl border border-orange-100 bg-orange-50/60 p-4">
       <div className="mb-3 flex items-center justify-between">
