@@ -2132,6 +2132,13 @@ function PeoplePage({ store, onAdd }: { store: DemoStore; onAdd: () => void }) {
           </button>
         }
       />
+      <button
+        onClick={onAdd}
+        className="mb-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#f36f21] px-4 py-3 text-sm font-semibold text-white shadow-sm sm:hidden"
+      >
+        <Plus className="h-4 w-4" />
+        Convidar pessoa
+      </button>
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Pessoas cadastradas"
@@ -2161,10 +2168,13 @@ function PeoplePage({ store, onAdd }: { store: DemoStore; onAdd: () => void }) {
           <h2 className="font-display text-base font-bold text-slate-950">
             Pessoas e permissões
           </h2>
-          <button className="text-xs font-semibold text-orange-600">
-            Gerenciar perfis
-          </button>
+          <span className="text-xs font-semibold text-slate-400">
+            Perfis editáveis na tabela
+          </span>
         </div>
+        <p className="mb-3 text-[11px] text-slate-400 sm:hidden">
+          Deslize a tabela para a esquerda para acessar perfil e ações.
+        </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[680px] text-left">
             <thead>
