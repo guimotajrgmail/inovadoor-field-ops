@@ -450,21 +450,28 @@
   // Fetch Interception
   // ==========================================================================
 
-  var originalFetch = window.fetch.bind(window);
+  try {
+    var originalFetch = window.fetch ? window.fetch.bind(window) : null;
+    if (originalFetch) {
+      window.fetch = function (input, init) {
+        init = init || {};
+        var startTime = Date.now();
+        // Handle string, Request object, or URL object
+        var url = typeof input === "string"
+          ? input
+          : (input && (input.url || input.href || String(input))) || "";
+        var method = init.method || (input && input.method) || "GET";
 
-  window.fetch = function (input, init) {
-    init = init || {};
-    var startTime = Date.now();
-    // Handle string, Request object, or URL object
-    var url = typeof input === "string"
-      ? input
-      : (input && (input.url || input.href || String(input))) || "";
-    var method = init.method || (input && input.method) || "GET";
-
-    // Don't intercept internal requests
-    if (url.indexOf("/__manus__/") === 0) {
-      return originalFetch(input, init);
+        // Don't intercept internal requests
+        if (url.indexOf("/__manus__/") === 0) {
+          return originalFetch(input, init);
+        }
+        return originalFetch(input, init);
+      };
     }
+  } catch (_e) {
+    // window.fetch has only a getter in sandboxed preview iframes
+  }
 
     // Safely parse headers (avoid breaking if headers format is invalid)
     var requestHeaders = {};

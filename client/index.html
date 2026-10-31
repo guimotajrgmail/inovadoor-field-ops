@@ -15,27 +15,22 @@
   <body>
     <div id="root"></div>
     <script type="module">
-      const isManagedPreview =
-        /(^|\.)manus(?:pre)?\.computer$/.test(location.hostname) ||
-        location.hostname === "localhost" ||
-        location.hostname === "127.0.0.1";
-
-      const clearManagedPreview = async () => {
-        if (!isManagedPreview || !("serviceWorker" in navigator)) return;
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(
-          registrations.map(registration => registration.unregister())
-        );
-        const cacheKeys = await caches.keys();
-        await Promise.all(cacheKeys.map(cacheKey => caches.delete(cacheKey)));
-      };
-
-      await clearManagedPreview();
-      if (!isManagedPreview && "serviceWorker" in navigator) {
-        await navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister();
+          }
+        });
       }
-      await import("/src/main.tsx");
+      if ("caches" in window) {
+        caches.keys().then((keys) => {
+          for (const key of keys) {
+            caches.delete(key);
+          }
+        });
+      }
     </script>
+    <script type="module" src="/src/main.tsx"></script>
     <script defer src="%VITE_ANALYTICS_ENDPOINT%/umami" data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
   </body>
 </html>

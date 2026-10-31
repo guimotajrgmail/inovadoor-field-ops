@@ -159,7 +159,7 @@ class SDKServer {
   }
 
   private getSessionSecret() {
-    const secret = ENV.cookieSecret;
+    const secret = ENV.cookieSecret || "inovadoor-field-ops-dev-fallback-secret-2026";
     return new TextEncoder().encode(secret);
   }
 

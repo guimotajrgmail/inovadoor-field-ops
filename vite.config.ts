@@ -176,9 +176,6 @@ const vitePreviewCompatibilityPlugin: Plugin = {
 const plugins = [
   tailwindcss(),
   jsxLocPlugin(),
-  vitePluginManusRuntime(),
-  vitePluginManusDebugCollector(),
-  vitePreviewCompatibilityPlugin,
 ];
 
 export default defineConfig({
@@ -218,15 +215,7 @@ export default defineConfig({
     // private WebSocket on localhost:5173. Disable the dev-only HMR client;
     // preview refreshes remain available through the managed proxy.
     hmr: false,
-    allowedHosts: [
-      ".manuspre.computer",
-      ".manus.computer",
-      ".manus-asia.computer",
-      ".manuscomputer.ai",
-      ".manusvm.computer",
-      "localhost",
-      "127.0.0.1",
-    ],
+    allowedHosts: true,
     fs: {
       strict: true,
       deny: ["**/.*"],

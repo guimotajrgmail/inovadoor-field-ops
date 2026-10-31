@@ -4,14 +4,18 @@
 
 import { ENV } from "./_core/env";
 
+const fallbackStorage = new Map<string, { buffer: Buffer; mime: string }>();
+
+export function getFallbackFile(key: string) {
+  return fallbackStorage.get(key);
+}
+
 function getForgeConfig() {
   const forgeUrl = ENV.forgeApiUrl;
   const forgeKey = ENV.forgeApiKey;
 
   if (!forgeUrl || !forgeKey) {
-    throw new Error(
-      "Storage config missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY",
-    );
+    return null;
   }
 
   return { forgeUrl: forgeUrl.replace(/\/+$/, ""), forgeKey };
@@ -33,8 +37,20 @@ export async function storagePut(
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream",
 ): Promise<{ key: string; url: string }> {
-  const { forgeUrl, forgeKey } = getForgeConfig();
+  const forgeConfig = getForgeConfig();
   const key = appendHashSuffix(normalizeKey(relKey));
+
+  if (!forgeConfig) {
+    const buf = Buffer.isBuffer(data)
+      ? data
+      : typeof data === "string"
+        ? Buffer.from(data)
+        : Buffer.from(data);
+    fallbackStorage.set(key, { buffer: buf, mime: contentType });
+    return { key, url: `/manus-storage/${key}` };
+  }
+
+  const { forgeUrl, forgeKey } = forgeConfig;
 
   // 1. Get presigned PUT URL from Forge
   const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");

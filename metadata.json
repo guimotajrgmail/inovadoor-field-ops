@@ -1,0 +1,10 @@
+{
+  "name": "Inovadoor Field Ops",
+  "description": "Inovadoor Field Ops — gestão de serviços, pessoas, terceiros e equipamentos.",
+  "capabilities": [
+    "server",
+    "db",
+    "user",
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
